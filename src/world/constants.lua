@@ -28,10 +28,12 @@ C.COLOR        = {
     -- Zoned-but-empty tile tints (so a plan is visible before it grows).
     ZONE_RES      = { 0.30, 0.45, 0.28 },
     ZONE_COM      = { 0.26, 0.36, 0.50 },
+    ZONE_IND      = { 0.46, 0.40, 0.20 }, -- dim amber
 
     -- Building markers drawn on top of a tile.
     BUILD_RES     = { 0.55, 0.85, 0.45 }, -- completed residential
     BUILD_COM     = { 0.45, 0.70, 0.95 }, -- completed commercial
+    BUILD_IND     = { 0.92, 0.78, 0.30 }, -- completed industrial (bright amber)
     BUILD_PENDING = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
 }
 
@@ -48,6 +50,7 @@ C.ZONE         = {
     NONE        = 0,
     RESIDENTIAL = 1,
     COMMERCIAL  = 2,
+    INDUSTRIAL  = 3,
 }
 
 -- Building lifecycle states.
@@ -59,6 +62,7 @@ C.BUILD        = {
 -- Population / jobs contributed by one completed building.
 C.POP_PER_RES  = 4
 C.JOBS_PER_COM = 4
+C.JOBS_PER_IND = 6 -- factories employ more than shops (first-pass, tunable)
 
 -- Demand tuning. BASE_RES seeds an empty city (residents always want in a bit),
 -- otherwise nothing ever grows. SENS is the demand shift per building imbalance.
@@ -97,6 +101,7 @@ C.TOOL         = {
     BULLDOZE = 1,
     ZONE_RES = 2,
     ZONE_COM = 3,
+    ZONE_IND = 4,
 }
 
 -- Event names published by world-state writers (Principle 4).
