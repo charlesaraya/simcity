@@ -19,16 +19,11 @@ local Tools = require("src.input.tools")
 local Camera = require("src.render.camera")
 local Iso = require("src.render.iso")
 local Renderer = require("src.render.renderer")
+local Hud = require("src.ui.hud")
 
 local world, cam, runner
 local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
-
-local TOOL_NAME = {
-    [C.TOOL.BULLDOZE] = "Bulldoze",
-    [C.TOOL.ZONE_RES] = "Residential",
-    [C.TOOL.ZONE_COM] = "Commercial",
-}
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
 -- paint loop and the hover highlight: screen -> world (camera) -> tile (iso).
@@ -71,26 +66,7 @@ end
 function love.draw()
     local tx, ty = hovered_tile()
     Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil)
-
-    -- Debug HUD (replaced by a real hud.lua in Step I).
-    love.graphics.setColor(1, 1, 1)
-    local year, month = Clock.date(world)
-    local speed_name = (speed == C.SPEED.PAUSED) and "Paused"
-        or (speed == C.SPEED.FAST) and "Fast" or "Normal"
-    local res_n = World.count_buildings(world, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE)
-    local com_n = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
-
-    love.graphics.print("Slow Grid - Phase 1", 16, 16)
-    love.graphics.print(("Date %04d-%02d   Speed: %s   FPS %d")
-        :format(year, month, speed_name, love.timer.getFPS()), 16, 38)
-    love.graphics.print(("Pop %d    Residential %d    Commercial %d")
-        :format(World.population(world), res_n, com_n), 16, 60)
-    love.graphics.print(("Demand   R %+.2f    C %+.2f")
-        :format(world.demand.residential, world.demand.commercial), 16, 82)
-    love.graphics.print(("Tool: %s"):format(TOOL_NAME[current_tool]), 16, 104)
-    love.graphics.print(
-        "[1]Bulldoze [2]Res [3]Com  |  hold-click paint  |  space pause  +/- speed  |  WASD/scroll camera",
-        16, love.graphics.getHeight() - 28)
+    Hud.draw(world, { tool = current_tool, speed = speed })
 end
 
 function love.keypressed(key)
