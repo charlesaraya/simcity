@@ -1,6 +1,5 @@
 -- src/render/iso.lua
 -- Isometric projection: the linear map between grid coordinates and screen pixels.
--- Pure math, no `love` calls, so it can be unit-tested headless later.
 --
 -- A diamond grid is a square grid run through a linear transform. tile_to_screen
 -- and screen_to_tile are exact inverses; tile_corners gives the four diamond
@@ -39,10 +38,10 @@ end
 -- (top, right, bottom, left) ready to hand to love.graphics.polygon.
 function Iso.tile_corners(x, y)
     local cx, cy = Iso.tile_to_screen(x, y)
-    return cx,      cy - HH, -- top
-           cx + HW, cy,      -- right
-           cx,      cy + HH, -- bottom
-           cx - HW, cy       -- left
+    return cx, cy - HH,      -- top
+        cx + HW, cy,         -- right
+        cx, cy + HH,         -- bottom
+        cx - HW, cy          -- left
 end
 
 return Iso
