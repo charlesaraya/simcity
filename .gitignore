@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+
+# LÖVE build artifacts
+*.love
+build/
+dist/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Lua / luarocks (Phase 1+)
+lua_modules/
+.luarocks/
+luacov.*.out
