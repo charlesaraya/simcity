@@ -51,6 +51,13 @@ C.BUILD = {
 C.POP_PER_RES  = 4
 C.JOBS_PER_COM = 4
 
+-- Demand tuning. BASE_RES seeds an empty city (residents always want in a bit),
+-- otherwise nothing ever grows. SENS is the demand shift per building imbalance.
+C.DEMAND = {
+    BASE_RES = 0.3,
+    SENS     = 0.1,
+}
+
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
 -- months and derives a calendar date from them.
 C.SIM = {
