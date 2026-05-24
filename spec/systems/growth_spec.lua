@@ -41,6 +41,15 @@ describe("Growth", function()
         assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
     end)
 
+    it("grows industrial buildings on zoned tiles when demand is positive", function()
+        local w = World.new(1)
+        zone_patch(w, 8, C.ZONE.INDUSTRIAL)
+        w.demand.industrial = 0.8
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        assert.is_true(World.count_buildings(w, C.ZONE.INDUSTRIAL) > 0)
+    end)
+
     it("takes CONSTRUCTION_TICKS months to complete a building", function()
         local w = World.new(1)
         World.zone_tile(w, 1, 1, C.ZONE.RESIDENTIAL)

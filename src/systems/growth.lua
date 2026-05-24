@@ -19,6 +19,7 @@ local Growth = {}
 local function demand_for(world, zone)
     if zone == C.ZONE.RESIDENTIAL then return world.demand.residential end
     if zone == C.ZONE.COMMERCIAL then return world.demand.commercial end
+    if zone == C.ZONE.INDUSTRIAL then return world.demand.industrial end
     return 0
 end
 
