@@ -21,6 +21,7 @@ function World.new(seed)
         grid = Grid.new(),
         rng = RNG.new(seed),
         demand = { residential = 0, commercial = 0 },
+        clock = { months = 0 }, -- elapsed sim-months; the clock system advances it
     }
 end
 

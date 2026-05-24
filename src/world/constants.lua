@@ -51,6 +51,22 @@ C.BUILD = {
 C.POP_PER_RES  = 4
 C.JOBS_PER_COM = 4
 
+-- Simulation time. One "month" is the base tick unit; the clock counts elapsed
+-- months and derives a calendar date from them.
+C.SIM = {
+    SECONDS_PER_MONTH = 1.0,  -- sim-seconds per month at speed 1
+    MONTHS_PER_YEAR   = 12,
+    START_YEAR        = 1900,
+}
+
+-- Game speed factors. Real dt is multiplied by one of these before reaching the
+-- runner, which is how pause and fast-forward come for free.
+C.SPEED = {
+    PAUSED = 0,
+    NORMAL = 1,
+    FAST   = 8,
+}
+
 -- Event names published by world-state writers (Principle 4). Named constants,
 -- not raw string literals scattered through systems, so a typo fails loudly.
 C.EVENTS = {
