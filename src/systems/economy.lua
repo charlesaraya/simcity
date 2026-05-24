@@ -15,10 +15,12 @@ local C = require("src.world.constants")
 
 local Economy = {}
 
--- Pure: occupants and building count -> monthly net delta. May be negative; the
--- system applies it without clamping (debt is allowed).
-function Economy.compute(pop, jobs, buildings)
-    return (pop + jobs) * C.ECON.TAX_RATE - buildings * C.ECON.UPKEEP
+-- Pure: total jobs and building count -> monthly net delta. Jobs are the tax
+-- base; every building costs flat upkeep. May be negative (a jobless,
+-- residential-heavy city); the system applies it without clamping (debt is
+-- allowed).
+function Economy.compute(jobs, buildings)
+    return jobs * C.ECON.TAX_RATE - buildings * C.ECON.UPKEEP
 end
 
 function Economy.system()
@@ -26,11 +28,7 @@ function Economy.system()
         interval = C.SIM.SECONDS_PER_MONTH,
         accumulator = 0,
         tick = function(world)
-            local net = Economy.compute(
-                World.population(world),
-                World.jobs(world),
-                World.building_count(world)
-            )
+            local net = Economy.compute(World.jobs(world), World.building_count(world))
             world.treasury = world.treasury + net
             world.economy.last_net = net
         end,

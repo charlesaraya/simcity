@@ -1,7 +1,9 @@
 -- spec/systems/economy_spec.lua
--- The economy is a pure observer: each month it taxes occupants and pays upkeep
--- per building, moving world.treasury. It gates nothing. compute() is the pure
--- money rule, tested directly; the system tick is checked against a built city.
+-- The economy is a pure observer: each month it taxes jobs (commerce + industry
+-- are where economic activity happens) and pays flat upkeep on every building.
+-- Residential earns nothing yet costs upkeep, so housing is a net liability the
+-- jobs it shelters must pay for. compute() is the pure money rule; the system
+-- tick is checked against built cities. The economy gates nothing.
 
 local Economy = require("src.systems.economy")
 local World = require("src.world.world")
@@ -19,19 +21,26 @@ describe("Economy", function()
     before_each(function() Bus.clear() end)
 
     describe("compute", function()
-        -- net = (pop + jobs) * TAX_RATE - buildings * UPKEEP
-        it("nets occupant tax minus per-building upkeep", function()
-            local expected = (100 + 50) * C.ECON.TAX_RATE - 10 * C.ECON.UPKEEP
-            assert.are.equal(expected, Economy.compute(100, 50, 10))
+        -- net = jobs * TAX_RATE - buildings * UPKEEP
+        it("nets job tax minus per-building upkeep", function()
+            local expected = 50 * C.ECON.TAX_RATE - 10 * C.ECON.UPKEEP
+            assert.are.equal(expected, Economy.compute(50, 10))
         end)
 
-        it("charges upkeep even with no occupants (net loss)", function()
-            assert.are.equal(-5 * C.ECON.UPKEEP, Economy.compute(0, 0, 5))
-            assert.is_true(Economy.compute(0, 0, 5) < 0)
+        it("makes a jobless building a pure cost (residential)", function()
+            assert.are.equal(-C.ECON.UPKEEP, Economy.compute(0, 1))
+            assert.is_true(Economy.compute(0, 1) < 0)
         end)
 
-        it("earns when occupant tax outweighs upkeep", function()
-            assert.is_true(Economy.compute(100, 100, 1) > 0)
+        it("makes a commercial building earn after upkeep", function()
+            -- one completed commercial building = JOBS_PER_COM jobs, 1 building
+            assert.is_true(Economy.compute(C.JOBS_PER_COM, 1) > 0)
+        end)
+
+        it("makes industry earn more per building than commerce", function()
+            local com = Economy.compute(C.JOBS_PER_COM, 1)
+            local ind = Economy.compute(C.JOBS_PER_IND, 1)
+            assert.is_true(ind > com)
         end)
     end)
 
@@ -42,12 +51,9 @@ describe("Economy", function()
 
         it("applies the monthly net to the treasury and records last_net", function()
             local w = World.new(1)
-            build(w, 1, 1, C.ZONE.RESIDENTIAL) -- pop
-            build(w, 2, 1, C.ZONE.INDUSTRIAL)  -- jobs
-            local pop = World.population(w)
-            local jobs = World.jobs(w)
-            local n = World.building_count(w)
-            local expected = Economy.compute(pop, jobs, n)
+            build(w, 1, 1, C.ZONE.COMMERCIAL)
+            build(w, 2, 1, C.ZONE.INDUSTRIAL)
+            local expected = Economy.compute(World.jobs(w), World.building_count(w))
 
             local before = w.treasury
             Economy.system().tick(w)
@@ -55,14 +61,42 @@ describe("Economy", function()
             assert.are.equal(expected, w.economy.last_net)
         end)
 
-        it("lets the treasury go negative (no floor at zero)", function()
-            -- A lone residential building's tax falls short of its upkeep under
-            -- the first-pass constants, so a bedroom-only city bleeds.
+        it("bleeds a residential-only city", function()
             local w = World.new(1)
-            w.treasury = 0
             build(w, 1, 1, C.ZONE.RESIDENTIAL)
+            build(w, 2, 1, C.ZONE.RESIDENTIAL)
+            local before = w.treasury
             Economy.system().tick(w)
-            assert.is_true(w.treasury < 0)
+            assert.is_true(w.treasury < before)
+        end)
+
+        it("holds a balanced residential/commercial city steady", function()
+            local w = World.new(1)
+            build(w, 1, 1, C.ZONE.RESIDENTIAL)
+            build(w, 2, 1, C.ZONE.RESIDENTIAL)
+            build(w, 3, 1, C.ZONE.COMMERCIAL)
+            build(w, 4, 1, C.ZONE.COMMERCIAL)
+            local before = w.treasury
+            Economy.system().tick(w)
+            assert.are.equal(before, w.treasury) -- commerce funds the housing
+        end)
+
+        it("lifts the treasury once industry is added", function()
+            local w = World.new(1)
+            build(w, 1, 1, C.ZONE.INDUSTRIAL)
+            local before = w.treasury
+            Economy.system().tick(w)
+            assert.is_true(w.treasury > before)
+        end)
+
+        it("does not floor the treasury at zero (debt persists)", function()
+            -- The economy gates nothing, so debt is allowed: a tick applies its
+            -- net without clamping. An empty city nets 0, so a pre-existing
+            -- deficit must survive the tick unchanged -- proof there's no floor.
+            local w = World.new(1)
+            w.treasury = -50
+            Economy.system().tick(w)
+            assert.are.equal(-50, w.treasury)
         end)
     end)
 end)

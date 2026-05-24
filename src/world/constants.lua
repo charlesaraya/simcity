@@ -81,14 +81,17 @@ C.GROWTH       = {
     ABANDON_RATE       = 0.1,
 }
 
--- Economy tuning (first-pass, expect to tune like DEMAND/GROWTH). Each month the
--- treasury gains TAX_RATE per occupant (population + jobs) and pays UPKEEP per
--- completed building. With these values a 4-occupant res/com building nets -1
--- and a 6-job industrial building nets +1: industry funds the city, a
--- bedroom-only town bleeds. The economy observes only -- it gates nothing.
+-- Economy tuning (first-pass, expect to tune like DEMAND/GROWTH). Tax comes from
+-- JOBS (commerce + industry -- where economic activity happens), and every
+-- completed building pays flat UPKEEP for services. Residents are not taxed
+-- directly, so housing is a pure liability the jobs it shelters must cover.
+-- Per-building net: residential -2 (0 jobs - 2), commercial +2 (4 - 2),
+-- industrial +4 (6 - 2). So a res-only town bleeds, balanced res/com holds
+-- steady (commerce funds the housing), and industry pulls the economy up
+-- hardest. The economy observes only -- it gates nothing.
 C.ECON         = {
-    TAX_RATE       = 1,
-    UPKEEP         = 5,
+    TAX_RATE       = 1, -- per job, per month
+    UPKEEP         = 2, -- per completed building, per month
     START_TREASURY = 1000,
 }
 
