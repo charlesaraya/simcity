@@ -1,0 +1,86 @@
+-- spec/world/grid_spec.lua
+-- Grid is pure data + free functions, so it tests headless with no LÖVE at all.
+
+local Grid = require("src.world.grid")
+local C = require("src.world.constants")
+
+describe("Grid", function()
+    it("new() fills the requested dimensions with grass", function()
+        local g = Grid.new(8, 5)
+        assert.are.equal(8, g.width)
+        assert.are.equal(5, g.height)
+        assert.are.equal(8 * 5, #g.tiles)
+        assert.are.equal(C.TILE.GRASS, g.tiles[1].type)
+        assert.are.equal(C.TILE.GRASS, g.tiles[#g.tiles].type)
+    end)
+
+    it("new() defaults to the configured grid size", function()
+        local g = Grid.new()
+        assert.are.equal(C.GRID_W, g.width)
+        assert.are.equal(C.GRID_H, g.height)
+    end)
+
+    describe("idx/coord", function()
+        local g = Grid.new(10, 10)
+
+        it("are inverses for every cell", function()
+            for y = 1, g.height do
+                for x = 1, g.width do
+                    local i = Grid.idx(g, x, y)
+                    local rx, ry = Grid.coord(g, i)
+                    assert.are.equal(x, rx)
+                    assert.are.equal(y, ry)
+                end
+            end
+        end)
+
+        it("maps (1,1) to index 1 and is row-major", function()
+            assert.are.equal(1, Grid.idx(g, 1, 1))
+            assert.are.equal(11, Grid.idx(g, 1, 2)) -- next row starts at width+1
+            assert.are.equal(10, Grid.idx(g, 10, 1))
+        end)
+    end)
+
+    describe("in_bounds", function()
+        local g = Grid.new(4, 3)
+        it("accepts the four corners", function()
+            assert.is_true(Grid.in_bounds(g, 1, 1))
+            assert.is_true(Grid.in_bounds(g, 4, 1))
+            assert.is_true(Grid.in_bounds(g, 1, 3))
+            assert.is_true(Grid.in_bounds(g, 4, 3))
+        end)
+        it("rejects everything past the edges", function()
+            assert.is_false(Grid.in_bounds(g, 0, 1))
+            assert.is_false(Grid.in_bounds(g, 5, 1))
+            assert.is_false(Grid.in_bounds(g, 1, 0))
+            assert.is_false(Grid.in_bounds(g, 1, 4))
+        end)
+    end)
+
+    describe("get/set_type", function()
+        it("reads and writes within bounds", function()
+            local g = Grid.new(4, 4)
+            assert.are.equal(C.TILE.GRASS, Grid.get(g, 2, 2).type)
+            assert.is_true(Grid.set_type(g, 2, 2, 99))
+            assert.are.equal(99, Grid.get(g, 2, 2).type)
+        end)
+        it("returns nil / false out of bounds", function()
+            local g = Grid.new(4, 4)
+            assert.is_nil(Grid.get(g, 0, 0))
+            assert.is_false(Grid.set_type(g, 99, 99, 1))
+        end)
+    end)
+
+    describe("neighbors", function()
+        local g = Grid.new(5, 5)
+        it("returns 4 for an interior cell", function()
+            assert.are.equal(4, #Grid.neighbors(g, 3, 3))
+        end)
+        it("returns 3 along an edge", function()
+            assert.are.equal(3, #Grid.neighbors(g, 1, 3))
+        end)
+        it("returns 2 at a corner", function()
+            assert.are.equal(2, #Grid.neighbors(g, 1, 1))
+        end)
+    end)
+end)
