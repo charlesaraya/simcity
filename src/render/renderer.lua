@@ -18,6 +18,7 @@ local BUILD_SCALE = 0.55 -- building diamond size relative to the tile
 local function tile_color(tile, x, y)
     if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.ZONE_RES end
     if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.ZONE_COM end
+    if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.ZONE_IND end
     -- unzoned: keep the grass checkerboard
     return ((x + y) % 2 == 0) and C.COLOR.GRASS_A or C.COLOR.GRASS_B
 end
@@ -26,6 +27,7 @@ local function building_color(tile)
     if tile.building.state == C.BUILD.CONSTRUCTING then return C.COLOR.BUILD_PENDING end
     if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.BUILD_RES end
     if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.BUILD_COM end
+    if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.BUILD_IND end
     return C.COLOR.BUILD_PENDING
 end
 

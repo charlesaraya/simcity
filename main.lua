@@ -1,10 +1,10 @@
 -- main.lua
 -- LÖVE entry point and orchestration. It owns no game logic,
 -- it wires the pieces together and routes LÖVE's callbacks to them:
---   setup:  bus + world + camera + runner (clock/demand/growth) + zoning
+--   setup:  bus + world + camera + runner (clock/demand/growth/economy) + zoning
 --   update: pan camera, hold-to-paint, advance the sim by speed-scaled dt
 --   draw:   hand the world to the renderer, then the debug HUD
---   input:  select tool (1/2/3), change speed, zoom
+--   input:  select tool (1/2/3/4), change speed, zoom
 
 local C = require("src.world.constants")
 local World = require("src.world.world")
@@ -14,6 +14,7 @@ local Runner = require("src.systems.runner")
 local Clock = require("src.systems.clock")
 local Demand = require("src.systems.demand")
 local Growth = require("src.systems.growth")
+local Economy = require("src.systems.economy")
 local Zoning = require("src.systems.zoning")
 local Tools = require("src.input.tools")
 local Camera = require("src.render.camera")
@@ -63,6 +64,7 @@ function love.load()
     Runner.add(runner, Clock.system())
     Runner.add(runner, Demand.system())
     Runner.add(runner, Growth.system())
+    Runner.add(runner, Economy.system())
     wire_world(world)
 end
 
@@ -95,6 +97,8 @@ function love.keypressed(key)
         current_tool = C.TOOL.ZONE_RES
     elseif key == "3" then
         current_tool = C.TOOL.ZONE_COM
+    elseif key == "4" then
+        current_tool = C.TOOL.ZONE_IND
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
     elseif key == "+" or key == "=" or key == "kp+" then
