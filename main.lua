@@ -1,12 +1,13 @@
 -- main.lua
--- LÖVE entry point. It calls the callbacks we define below:
---   love.load        once, at startup
---   love.update(dt)  every frame, dt = seconds since last frame
---   love.draw        every frame, after update
---   love.keypressed  on key press
+-- LÖVE entry point and orchestration. Wires the world grid and the camera,
+-- then drives them through LÖVE's callbacks:
+--   love.load        build grid + camera
+--   love.update(dt)  pan the camera (WASD)
+--   love.draw        render the grid through the camera, highlight the picked tile
+--   love.keypressed  Esc to quit
+--   love.wheelmoved  cursor-anchored zoom
 --
--- Step A is deliberately empty of game logic: prove the window opens and the
--- loop runs before we add a single tile.
+-- Picking pipeline: screen -> Camera.screen_to_world -> Iso.screen_to_tile.
 
 local Grid = require("src.world.grid")
 local Iso = require("src.render.iso")
