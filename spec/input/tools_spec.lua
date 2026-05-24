@@ -22,6 +22,12 @@ describe("Tools", function()
         assert.are.equal(C.ZONE.COMMERCIAL, w.grid.tiles[w.grid.width * 1 + 2].zone)
     end)
 
+    it("ZONE_IND zones a tile industrial", function()
+        local w = World.new(1)
+        assert.is_true(Tools.apply(C.TOOL.ZONE_IND, w, 2, 2))
+        assert.are.equal(C.ZONE.INDUSTRIAL, w.grid.tiles[w.grid.width * 1 + 2].zone)
+    end)
+
     it("BULLDOZE clears zone and building", function()
         local w = World.new(1)
         Tools.apply(C.TOOL.ZONE_RES, w, 2, 2)

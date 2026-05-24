@@ -18,6 +18,8 @@ function Tools.apply(tool, world, x, y)
         return World.zone_tile(world, x, y, C.ZONE.RESIDENTIAL)
     elseif tool == C.TOOL.ZONE_COM then
         return World.zone_tile(world, x, y, C.ZONE.COMMERCIAL)
+    elseif tool == C.TOOL.ZONE_IND then
+        return World.zone_tile(world, x, y, C.ZONE.INDUSTRIAL)
     end
     return false
 end
