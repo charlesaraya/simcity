@@ -25,10 +25,13 @@ function World.new(seed)
     }
 end
 
--- WRITE: designate a tile's zone. Publishes tile_zoned.
+-- WRITE: designate a tile's zone. Idempotent -- zoning a tile to the zone it
+-- already has is a no-op (no event), so hold-to-paint never spams events or
+-- re-triggers consequences. Publishes tile_zoned only on an actual change.
 function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
+    if tile.zone == zone then return false end
     tile.zone = zone
     Bus.publish(C.EVENTS.TILE_ZONED, { x = x, y = y, zone = zone })
     return true
