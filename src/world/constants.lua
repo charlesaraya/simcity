@@ -34,4 +34,31 @@ C.CAM = {
     ZOOM_STEP = 1.1,   -- scale multiplier per wheel notch
 }
 
+-- Zone a tile can hold. NONE = unzoned grass.
+C.ZONE = {
+    NONE        = 0,
+    RESIDENTIAL = 1,
+    COMMERCIAL  = 2,
+}
+
+-- Building lifecycle states.
+C.BUILD = {
+    CONSTRUCTING = 1,
+    COMPLETE     = 2,
+}
+
+-- Population / jobs contributed by one completed building.
+C.POP_PER_RES  = 4
+C.JOBS_PER_COM = 4
+
+-- Event names published by world-state writers (Principle 4). Named constants,
+-- not raw string literals scattered through systems, so a typo fails loudly.
+C.EVENTS = {
+    TILE_ZONED           = "tile_zoned",
+    TILE_BULLDOZED       = "tile_bulldozed",
+    BUILDING_CONSTRUCTED = "building_constructed",
+    BUILDING_ABANDONED   = "building_abandoned",
+    MONTH_ELAPSED        = "month_elapsed",
+}
+
 return C

@@ -52,7 +52,8 @@ function Grid.new(width, height)
     height = height or C.GRID_H
     local tiles = {}
     for i = 1, width * height do
-        tiles[i] = { type = C.TILE.GRASS }
+        -- type = terrain; zone = planning designation; building added on growth.
+        tiles[i] = { type = C.TILE.GRASS, zone = C.ZONE.NONE }
     end
     return { width = width, height = height, tiles = tiles }
 end
