@@ -20,10 +20,27 @@ local Camera = require("src.render.camera")
 local Iso = require("src.render.iso")
 local Renderer = require("src.render.renderer")
 local Hud = require("src.ui.hud")
+local Save = require("src.persistence.save")
 
 local world, cam, runner
 local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
+
+-- Transient HUD status ("Saved"/"Loaded"), cleared after a short while.
+local status_msg, status_until = nil, 0
+local function flash(msg)
+    status_msg = msg
+    status_until = love.timer.getTime() + 1.5
+end
+
+-- (Re)wire event-driven systems onto a world. Zoning subscribes with a closure
+-- over the world, so after a load (a new world table) the bus must be cleared
+-- and zoning re-installed. Ticking systems take world as an argument, so they
+-- need no rewiring.
+local function wire_world(w)
+    Bus.clear()
+    Zoning.install(w)
+end
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
 -- paint loop and the hover highlight: screen -> world (camera) -> tile (iso).
@@ -39,7 +56,6 @@ function love.load()
     love.graphics.setFont(love.graphics.newFont(15))
     love.graphics.setBackgroundColor(C.COLOR.BG)
 
-    Bus.clear()
     world = World.new(os.time()) -- seed varies per run
     cam = Camera.new()
 
@@ -47,7 +63,7 @@ function love.load()
     Runner.add(runner, Clock.system())
     Runner.add(runner, Demand.system())
     Runner.add(runner, Growth.system())
-    Zoning.install(world)
+    wire_world(world)
 end
 
 function love.update(dt)
@@ -66,7 +82,8 @@ end
 function love.draw()
     local tx, ty = hovered_tile()
     Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil)
-    Hud.draw(world, { tool = current_tool, speed = speed })
+    local msg = (love.timer.getTime() < status_until) and status_msg or nil
+    Hud.draw(world, { tool = current_tool, speed = speed, status = msg })
 end
 
 function love.keypressed(key)
@@ -85,6 +102,18 @@ function love.keypressed(key)
         speed = C.SPEED.FAST
     elseif key == "-" or key == "kp-" then
         speed = C.SPEED.NORMAL
+    elseif key == "f5" then
+        Save.save(world, 1)
+        flash("Saved")
+    elseif key == "f9" then
+        local loaded = Save.load(1)
+        if loaded then
+            world = loaded
+            wire_world(world)
+            flash("Loaded")
+        else
+            flash("No save")
+        end
     end
 end
 

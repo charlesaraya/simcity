@@ -39,8 +39,14 @@ function Hud.draw(world, opts)
         :format(world.demand.residential, world.demand.commercial), 16, 82)
     love.graphics.print(("Tool: %s"):format(TOOL_NAME[opts.tool]), 16, 104)
 
+    if opts.status then
+        love.graphics.setColor(C.COLOR.HIGHLIGHT)
+        love.graphics.print(opts.status, 230, 16)
+        love.graphics.setColor(1, 1, 1)
+    end
+
     love.graphics.print(
-        "[1]Bulldoze [2]Res [3]Com  |  hold-click paint  |  space pause  +/- speed  |  WASD/scroll camera",
+        "[1]Bulldoze [2]Res [3]Com  |  hold-click paint  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
         16, love.graphics.getHeight() - 28)
 end
 
