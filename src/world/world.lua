@@ -20,7 +20,7 @@ function World.new(seed)
     return {
         grid = Grid.new(),
         rng = RNG.new(seed),
-        demand = { residential = 0, commercial = 0 },
+        demand = { residential = 0, commercial = 0, industrial = 0 },
         clock = { months = 0 }, -- elapsed sim-months; the clock system advances it
     }
 end
@@ -94,6 +94,26 @@ end
 -- READ: total population = completed residential buildings * per-building pop.
 function World.population(world)
     return World.count_buildings(world, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE) * C.POP_PER_RES
+end
+
+-- READ: total jobs = completed commercial + industrial buildings, each scaled by
+-- its per-zone job count. Both zones employ; only residential houses.
+function World.jobs(world)
+    local com = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
+    local ind = World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
+    return com * C.JOBS_PER_COM + ind * C.JOBS_PER_IND
+end
+
+-- READ: total completed buildings across every zone. The economy taxes occupants
+-- but pays upkeep per building regardless of kind, so it needs this gross count.
+function World.building_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.building and tile.building.state == C.BUILD.COMPLETE then
+            n = n + 1
+        end
+    end)
+    return n
 end
 
 return World
