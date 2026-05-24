@@ -15,3 +15,6 @@ dist/
 lua_modules/
 .luarocks/
 luacov.*.out
+
+# Personal session-tracking notes (not shared)
+.claude/
