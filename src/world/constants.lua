@@ -58,6 +58,16 @@ C.DEMAND = {
     SENS     = 0.1,
 }
 
+-- Growth tuning. RATE scales positive demand into a per-month build chance.
+-- CONSTRUCTION_TICKS months to finish. Buildings abandon only when demand drops
+-- below ABANDON_THRESHOLD, at a chance scaled by ABANDON_RATE.
+C.GROWTH = {
+    RATE               = 0.15,
+    CONSTRUCTION_TICKS = 2,
+    ABANDON_THRESHOLD  = -0.5,
+    ABANDON_RATE       = 0.1,
+}
+
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
 -- months and derives a calendar date from them.
 C.SIM = {
