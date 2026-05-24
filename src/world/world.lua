@@ -22,6 +22,8 @@ function World.new(seed)
         rng = RNG.new(seed),
         demand = { residential = 0, commercial = 0, industrial = 0 },
         clock = { months = 0 }, -- elapsed sim-months; the clock system advances it
+        treasury = C.ECON.START_TREASURY, -- city funds; the economy moves this
+        economy = { last_net = 0 },        -- last month's net delta, for the HUD
     }
 end
 

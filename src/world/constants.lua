@@ -81,6 +81,17 @@ C.GROWTH       = {
     ABANDON_RATE       = 0.1,
 }
 
+-- Economy tuning (first-pass, expect to tune like DEMAND/GROWTH). Each month the
+-- treasury gains TAX_RATE per occupant (population + jobs) and pays UPKEEP per
+-- completed building. With these values a 4-occupant res/com building nets -1
+-- and a 6-job industrial building nets +1: industry funds the city, a
+-- bedroom-only town bleeds. The economy observes only -- it gates nothing.
+C.ECON         = {
+    TAX_RATE       = 1,
+    UPKEEP         = 5,
+    START_TREASURY = 1000,
+}
+
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
 -- months and derives a calendar date from them.
 C.SIM          = {
