@@ -1,12 +1,13 @@
 -- src/systems/demand.lua
--- Each month, recompute residential and commercial demand from current building
--- counts and write them into world.demand. Growth reads those values to decide
--- what to build. This is one half of the feedback loop (Principle 5).
+-- Each month, recompute residential, commercial, and industrial demand from
+-- current building counts and write them into world.demand. Growth reads those
+-- values to decide what to build. This is one half of the feedback loop
+-- (Principle 5).
 --
--- The rule (blueprint, deliberately trivial for Phase 1):
---   residential demand rises when commerce outnumbers housing,
---   commercial demand rises when housing outnumbers commerce,
--- plus a residential baseline so an empty city has somewhere to start.
+-- The rule is a supply chain (Phase 2): residents chase jobs (com + ind),
+-- commerce needs shoppers (res), industry needs commerce to sell its goods.
+-- A single residential baseline seeds the cascade RES -> COM -> IND; industrial
+-- jobs feed back into residential demand to close the loop.
 
 local World = require("src.world.world")
 local C = require("src.world.constants")

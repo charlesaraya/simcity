@@ -1,9 +1,9 @@
 -- src/systems/economy.lua
--- The city budget, as a pure observer. Each month it collects tax from every
--- occupant (residents + workers) and pays upkeep on every completed building,
--- then moves world.treasury by the net. It GATES NOTHING -- zoning and growth
--- never ask whether there's money. Treasury is a score and a feedback signal,
--- not yet a constraint.
+-- The city budget, as a pure observer. Each month it taxes JOBS (commerce and
+-- industry -- where economic activity happens; residents are not taxed) and
+-- pays flat upkeep on every completed building, then moves world.treasury by the
+-- net. It GATES NOTHING -- zoning and growth never ask whether there's money.
+-- Treasury is a score and a feedback signal, not yet a constraint.
 --
 -- This system is the test of Phase 1's decoupling bet: it subscribes to no
 -- events and is referenced by nothing it observes. It reads world state by

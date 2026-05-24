@@ -15,7 +15,8 @@ local C = require("src.world.constants")
 local World = {}
 
 -- Build a new world. The grid is all grass; the RNG is seeded so growth is
--- reproducible; demand starts neutral.
+-- reproducible; demand starts neutral; the treasury starts funded and the
+-- economy's last-net readout at zero.
 function World.new(seed)
     return {
         grid = Grid.new(),
@@ -79,12 +80,13 @@ function World.abandon_building(world, x, y)
     return true
 end
 
--- READ: count buildings of a zone, optionally filtered by lifecycle state.
+-- READ: count buildings, optionally filtered by zone and/or lifecycle state. A
+-- nil zone counts every zone (a cross-zone total); a nil state counts any state.
 -- Derived by scanning -- no cached total to fall out of sync.
 function World.count_buildings(world, zone, state)
     local n = 0
     Grid.each(world.grid, function(_, _, tile)
-        if tile.building and tile.zone == zone then
+        if tile.building and (zone == nil or tile.zone == zone) then
             if (not state) or tile.building.state == state then
                 n = n + 1
             end
@@ -106,16 +108,11 @@ function World.jobs(world)
     return com * C.JOBS_PER_COM + ind * C.JOBS_PER_IND
 end
 
--- READ: total completed buildings across every zone. The economy taxes occupants
--- but pays upkeep per building regardless of kind, so it needs this gross count.
+-- READ: total completed buildings across every zone. The economy pays upkeep
+-- per building regardless of kind, so it needs this gross count. A zone-less
+-- count_buildings call -- one scan, no duplicated walk logic.
 function World.building_count(world)
-    local n = 0
-    Grid.each(world.grid, function(_, _, tile)
-        if tile.building and tile.building.state == C.BUILD.COMPLETE then
-            n = n + 1
-        end
-    end)
-    return n
+    return World.count_buildings(world, nil, C.BUILD.COMPLETE)
 end
 
 return World

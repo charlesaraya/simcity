@@ -71,14 +71,20 @@ describe("Economy", function()
         end)
 
         it("holds a balanced residential/commercial city steady", function()
+            -- Two res + two com: commerce's job tax should exactly cover all four
+            -- buildings' upkeep. Derive the expectation from compute so this stays
+            -- honest if the constants are retuned -- the point is "balanced nets
+            -- whatever compute says", and under the first-pass tuning that's zero.
             local w = World.new(1)
             build(w, 1, 1, C.ZONE.RESIDENTIAL)
             build(w, 2, 1, C.ZONE.RESIDENTIAL)
             build(w, 3, 1, C.ZONE.COMMERCIAL)
             build(w, 4, 1, C.ZONE.COMMERCIAL)
+            local expected = Economy.compute(World.jobs(w), World.building_count(w))
             local before = w.treasury
             Economy.system().tick(w)
-            assert.are.equal(before, w.treasury) -- commerce funds the housing
+            assert.are.equal(before + expected, w.treasury)
+            assert.are.equal(0, expected) -- first-pass tuning: commerce funds the housing
         end)
 
         it("lifts the treasury once industry is added", function()

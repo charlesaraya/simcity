@@ -25,13 +25,15 @@ end
 describe("Save", function()
     before_each(function() Bus.clear() end)
 
-    it("round-trips a world, including rng state, clock, demand, and grid", function()
+    it("round-trips a world, including rng state, clock, demand, economy, and grid", function()
         local w = World.new(42)
         World.zone_tile(w, 1, 1, C.ZONE.RESIDENTIAL)
         World.start_building(w, 1, 1)
         World.complete_building(w, 1, 1)
         w.demand.residential = 0.5
         w.clock.months = 7
+        w.treasury = 1234
+        w.economy.last_net = -7
         RNG.random(w.rng); RNG.random(w.rng) -- advance the generator
 
         local w2 = Save.deserialize(Save.serialize(w))
@@ -39,6 +41,8 @@ describe("Save", function()
         assert.are.equal(w.rng.state, w2.rng.state)
         assert.are.equal(w.clock.months, w2.clock.months)
         assert.are.same(w.demand, w2.demand)
+        assert.are.equal(w.treasury, w2.treasury)
+        assert.are.same(w.economy, w2.economy)
         assert.are.same(w.grid, w2.grid)
     end)
 
