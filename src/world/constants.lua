@@ -84,6 +84,13 @@ C.SPEED = {
     FAST   = 8,
 }
 
+-- Player tools (selected with keys 1/2/3).
+C.TOOL = {
+    BULLDOZE = 1,
+    ZONE_RES = 2,
+    ZONE_COM = 3,
+}
+
 -- Event names published by world-state writers (Principle 4). Named constants,
 -- not raw string literals scattered through systems, so a typo fails loudly.
 C.EVENTS = {
