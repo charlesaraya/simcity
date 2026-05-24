@@ -14,8 +14,8 @@ function Runner.new()
     return { systems = {} }
 end
 
--- Register a system. Returns it so callers can keep a handle. Defaults the
--- accumulator so systems don't have to.
+-- Register a system. Returns it so callers can keep a handle.
+-- Defaults the accumulator so systems don't have to.
 function Runner.add(runner, system)
     system.accumulator = system.accumulator or 0
     runner.systems[#runner.systems + 1] = system
