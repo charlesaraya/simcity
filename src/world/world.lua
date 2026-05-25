@@ -30,7 +30,7 @@ function World.new(seed)
 end
 
 -- WRITE: designate a tile's zone. Idempotent: re-zoning is a no-op (no event);
--- hold-to-paint never spams events. Refuses a road tile -- bulldoze clears roads.
+-- hold-to-paint never spams events. Refuses a road tile.
 function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
@@ -41,9 +41,8 @@ function World.zone_tile(world, x, y, zone)
     return true
 end
 
--- WRITE: clear a tile back to plain grass. A road tile clears the road and
--- publishes road_removed (so the roads system recomputes); any other tile clears
--- zone + building and publishes tile_bulldozed. Road/zone are mutually exclusive.
+-- WRITE: clear a tile back to plain grass. A road tile clears the road;
+-- any other tile clears zone + building.
 function World.bulldoze(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
