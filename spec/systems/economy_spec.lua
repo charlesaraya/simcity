@@ -127,6 +127,35 @@ describe("Economy", function()
         end)
     end)
 
+    describe("install (zoning expense)", function()
+        it("debits the per-zone cost when a tile is zoned", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            assert.are.equal(before - C.ZONE_COST[C.ZONE.RESIDENTIAL], w.treasury)
+        end)
+
+        it("charges each zone its own cost (reads the event's zone)", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.zone_tile(w, 2, 2, C.ZONE.COMMERCIAL)
+            World.zone_tile(w, 3, 2, C.ZONE.INDUSTRIAL)
+            local expected = before - C.ZONE_COST[C.ZONE.COMMERCIAL] - C.ZONE_COST[C.ZONE.INDUSTRIAL]
+            assert.are.equal(expected, w.treasury)
+        end)
+
+        it("does not re-charge an idempotent re-zone (no event, no debit)", function()
+            local w = World.new(1)
+            Economy.install(w)
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            local after_first = w.treasury
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL) -- same zone: no-op, no event
+            assert.are.equal(after_first, w.treasury)
+        end)
+    end)
+
     describe("install (road expense)", function()
         it("debits exactly ROAD.COST when a road is built", function()
             local w = World.new(1)

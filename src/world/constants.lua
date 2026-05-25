@@ -95,14 +95,12 @@ C.GROWTH       = {
     ABANDON_RATE       = 0.1,
 }
 
--- Economy tuning (first-pass, expect to tune like DEMAND/GROWTH). Tax comes from
--- JOBS (commerce + industry -- where economic activity happens), and every
--- completed building pays flat UPKEEP for services. Residents are not taxed
+-- Economy tuning.
+-- Tax comes from JOBS (commerce + industry: where economic activity happens),
+-- and every completed building pays flat UPKEEP for services. Residents are not taxed
 -- directly, so housing is a pure liability the jobs it shelters must cover.
--- Per-building net: residential -2 (0 jobs - 2), commercial +2 (4 - 2),
--- industrial +4 (6 - 2). So a res-only town bleeds, balanced res/com holds
--- steady (commerce funds the housing), and industry pulls the economy up
--- hardest. The economy observes only -- it gates nothing.
+-- A res-only town bleeds, balanced res/com holds steady (commerce funds the housing),
+-- and industry pulls the economy up hardest.
 C.ECON         = {
     TAX_RATE       = 1, -- per job, per month
     UPKEEP         = 2, -- per completed building, per month
@@ -133,12 +131,17 @@ C.TOOL         = {
     ROAD     = 5,
 }
 
--- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep);
--- the input layer blocks placement when the treasury can't cover it, and the
--- economy debits it on road_built. First-pass like DEMAND/GROWTH -- tune later.
--- START_TREASURY (1000) / COST (10) = a 100-tile starter network before debt.
+-- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep).
 C.ROAD         = {
     COST = 10,
+}
+
+-- One-time cost to zone a tile, charged at zoning.
+-- Housing is cheap to encourage settlement; industry is priciest.
+C.ZONE_COST    = {
+    [C.ZONE.RESIDENTIAL] = 10,
+    [C.ZONE.COMMERCIAL]  = 25,
+    [C.ZONE.INDUSTRIAL]  = 40,
 }
 
 -- Event names published by world-state writers (Principle 4).

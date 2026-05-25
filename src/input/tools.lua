@@ -9,17 +9,23 @@ local C = require("src.world.constants")
 
 local Tools = {}
 
+-- Affordability gate for zoning, mirroring the road gate.
+local function zone_with_cost(world, x, y, zone)
+    if world.treasury < C.ZONE_COST[zone] then return false end
+    return World.zone_tile(world, x, y, zone)
+end
+
 -- Apply `tool` to tile (x, y). Returns whatever the underlying writer returns
 -- (true on a real change, false on no-op / out of bounds).
 function Tools.apply(tool, world, x, y)
     if tool == C.TOOL.BULLDOZE then
         return World.bulldoze(world, x, y)
     elseif tool == C.TOOL.ZONE_RES then
-        return World.zone_tile(world, x, y, C.ZONE.RESIDENTIAL)
+        return zone_with_cost(world, x, y, C.ZONE.RESIDENTIAL)
     elseif tool == C.TOOL.ZONE_COM then
-        return World.zone_tile(world, x, y, C.ZONE.COMMERCIAL)
+        return zone_with_cost(world, x, y, C.ZONE.COMMERCIAL)
     elseif tool == C.TOOL.ZONE_IND then
-        return World.zone_tile(world, x, y, C.ZONE.INDUSTRIAL)
+        return zone_with_cost(world, x, y, C.ZONE.INDUSTRIAL)
     elseif tool == C.TOOL.ROAD then
         -- Affordability gate: command layer refuses to build the road
         -- if the city can't afford it.
