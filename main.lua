@@ -16,6 +16,7 @@ local Demand = require("src.systems.demand")
 local Growth = require("src.systems.growth")
 local Economy = require("src.systems.economy")
 local Zoning = require("src.systems.zoning")
+local Roads = require("src.systems.roads")
 local Tools = require("src.input.tools")
 local Camera = require("src.render.camera")
 local Iso = require("src.render.iso")
@@ -41,6 +42,8 @@ end
 local function wire_world(w)
     Bus.clear()
     Zoning.install(w)
+    Roads.install(w)    -- recomputes the connectivity cache from the grid (on load too)
+    Economy.install(w)  -- subscribes the one-time road-cost debit
 end
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
@@ -99,6 +102,8 @@ function love.keypressed(key)
         current_tool = C.TOOL.ZONE_COM
     elseif key == "4" then
         current_tool = C.TOOL.ZONE_IND
+    elseif key == "5" then
+        current_tool = C.TOOL.ROAD
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
     elseif key == "+" or key == "=" or key == "kp+" then

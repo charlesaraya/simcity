@@ -17,6 +17,7 @@ local TOOL_NAME = {
     [C.TOOL.ZONE_RES] = "Residential",
     [C.TOOL.ZONE_COM] = "Commercial",
     [C.TOOL.ZONE_IND] = "Industrial",
+    [C.TOOL.ROAD]     = "Road",
 }
 
 local function speed_name(speed)
@@ -32,7 +33,7 @@ function Hud.draw(world, opts)
     local com_n = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
     local ind_n = World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
 
-    love.graphics.print("Slow Grid - Phase 2", 16, 16)
+    love.graphics.print("Slow Grid - Phase 3", 16, 16)
     love.graphics.print(("Date %04d-%02d   Speed: %s   FPS %d")
         :format(year, month, speed_name(opts.speed), love.timer.getFPS()), 16, 38)
     love.graphics.print(("Pop %d    R %d    C %d    I %d")
@@ -50,7 +51,7 @@ function Hud.draw(world, opts)
     end
 
     love.graphics.print(
-        "[1]Bulldoze [2]Res [3]Com [4]Ind  |  hold-click paint  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
+        "[1]Bulldoze [2]Res [3]Com [4]Ind [5]Road  |  hold-click paint  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
         16, love.graphics.getHeight() - 28)
 end
 
