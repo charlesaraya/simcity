@@ -25,6 +25,10 @@ function World.new(seed)
         clock = { months = 0 }, -- elapsed sim-months; the clock system advances it
         treasury = C.ECON.START_TREASURY, -- city funds; the economy moves this
         economy = { last_net = 0 },        -- last month's net delta, for the HUD
+        -- Derived road-connectivity cache (the roads system fills `connected`
+        -- with the indices of road tiles reaching a map edge). Rebuilt from the
+        -- grid on install/load, so a stale serialized copy can't desync it.
+        roads = { connected = {} },
     }
 end
 
@@ -48,6 +52,20 @@ function World.bulldoze(world, x, y)
     tile.zone = C.ZONE.NONE
     tile.building = nil
     Bus.publish(C.EVENTS.TILE_BULLDOZED, { x = x, y = y })
+    return true
+end
+
+-- WRITE: lay a road on a tile. Roads are mutually exclusive with zones and
+-- buildings, so this only succeeds on plain, unzoned grass -- otherwise it's a
+-- no-op (the player must bulldoze first). Publishes road_built so the roads
+-- system can recompute connectivity. Idempotent: re-roading a road tile is a
+-- no-op (no event), so hold-to-paint never re-fires.
+function World.build_road(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not tile then return false end
+    if tile.road or tile.zone ~= C.ZONE.NONE or tile.building then return false end
+    tile.road = true
+    Bus.publish(C.EVENTS.ROAD_BUILT, { x = x, y = y })
     return true
 end
 
