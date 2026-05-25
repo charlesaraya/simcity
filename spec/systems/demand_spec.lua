@@ -41,6 +41,37 @@ describe("Demand", function()
             assert.is_true(id > 0)
         end)
 
+        it("sizes commerce as a fraction of residents, not 1:1", function()
+            -- 4 res, 4 com: under the old 1:1 rule cd would be 0 (balanced).
+            -- Now commerce targets only a fraction of residents, so 4 com is an
+            -- oversupply -> negative commercial demand.
+            local _, cd = Demand.compute(4, 4, 0)
+            assert.is_true(cd < 0)
+        end)
+
+        it("sizes industry as a fraction of commerce, not 1:1", function()
+            local _, _, id = Demand.compute(0, 4, 4) -- 4 ind vs 4 com: oversupplied
+            assert.is_true(id < 0)
+        end)
+
+        it("holds the 4:2:1 shape: commerce and industry stay balanced at the ratio", function()
+            -- At 4 res / 2 com / 1 ind the downstream tiers are neutral:
+            -- com = res * COM_PER_RES, ind = com * IND_PER_COM.
+            local _, cd, id = Demand.compute(4, 2, 1)
+            assert.are.equal(0, cd)
+            assert.are.equal(0, id)
+        end)
+
+        it("never stalls: residential demand stays positive at the 4:2:1 balance", function()
+            -- Job opportunity (JOB_PULL > 1) keeps residents arriving even when the
+            -- city is perfectly in ratio -- so there is no fixed point and growth
+            -- continues. Old closed-loop model gave rd = 0 here.
+            local rd1 = Demand.compute(12, 6, 3)
+            local rd2 = Demand.compute(120, 60, 30) -- and at 10x scale
+            assert.is_true(rd1 > 0)
+            assert.is_true(rd2 > 0)
+        end)
+
         it("clamps all three demands to [-1, 1]", function()
             local rd1, cd1, id1 = Demand.compute(0, 0, 1000)
             local rd2, cd2, id2 = Demand.compute(1000, 0, 0)

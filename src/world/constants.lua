@@ -66,16 +66,28 @@ C.POP_PER_RES  = 4
 C.JOBS_PER_COM = 4
 C.JOBS_PER_IND = 6 -- factories employ more than shops (first-pass, tunable)
 
--- Demand tuning. BASE_RES seeds an empty city (residents always want in a bit),
--- otherwise nothing ever grows. SENS is the demand shift per building imbalance.
+-- Demand tuning.
+-- BASE_RES seeds an empty city (residents always want in a bit),
+--   otherwise nothing ever grows.
+-- SENS is the demand shift per building imbalance.
+-- COM_PER_RES / IND_PER_COM size each downstream tier as a FRACTION of the one
+--   above (one shop serves several homes; one factory supplies several shops), so
+--   the city settles around a 4:2:1 res:com:ind ratio.
+-- JOB_PULL pulls more than one resident's worth of demand (>1), so the
+--   loop gain exceeds 1: the city grows perpetually, in ratio.
 C.DEMAND       = {
-    BASE_RES = 0.3,
-    SENS     = 0.1,
+    BASE_RES    = 0.3,
+    SENS        = 0.1,
+    COM_PER_RES = 0.5,
+    IND_PER_COM = 0.5,
+    JOB_PULL    = 1.5,
 }
 
--- Growth tuning. RATE scales positive demand into a per-month build chance.
--- CONSTRUCTION_TICKS months to finish. Buildings abandon only when demand drops
--- below ABANDON_THRESHOLD, at a chance scaled by ABANDON_RATE.
+-- Growth tuning.
+-- RATE scales positive demand into a per-month build chance.
+-- CONSTRUCTION_TICKS months to finish.
+-- ABANDON_THRESHOLD: Buildings abandon only when demand drops below this threshold,
+-- at a chance scaled by ABANDON_RATE.
 C.GROWTH       = {
     RATE               = 0.15,
     CONSTRUCTION_TICKS = 2,

@@ -19,16 +19,18 @@ local function clamp(v, lo, hi)
 end
 
 -- Pure: building counts -> (residential, commercial, industrial demand), each
--- in [-1, 1]. A supply chain rather than a tug-of-war:
---   residents chase jobs    -> rd rises when (com + ind) outnumber housing
---   commerce needs shoppers -> cd rises when res outnumber com
---   industry supplies shops -> id rises when com outnumber ind
--- BASE_RES is the only seed; the cascade RES -> COM -> IND lights from there.
+-- in [-1, 1]. A supply chain with FRACTIONAL targets downstream so the city settles ~4:2:1:
+--   residents chase opportunity -> rd rises while res < jobs * JOB_PULL
+--   commerce serves homes        -> cd rises while com < res * COM_PER_RES
+--   industry supplies shops      -> id rises while ind < com * IND_PER_COM
+-- JOB_PULL > 1 makes the loop self-amplifying: residents always trail job
+-- opportunity, so there's no fixed point and the city grows perpetually in
+-- ratio. BASE_RES seeds the empty city before any jobs exist.
 function Demand.compute(res, com, ind)
     local jobs = com + ind
-    local rd = clamp(C.DEMAND.BASE_RES + (jobs - res) * C.DEMAND.SENS, -1, 1)
-    local cd = clamp((res - com) * C.DEMAND.SENS, -1, 1)
-    local id = clamp((com - ind) * C.DEMAND.SENS, -1, 1)
+    local rd = clamp(C.DEMAND.BASE_RES + (jobs * C.DEMAND.JOB_PULL - res) * C.DEMAND.SENS, -1, 1)
+    local cd = clamp((res * C.DEMAND.COM_PER_RES - com) * C.DEMAND.SENS, -1, 1)
+    local id = clamp((com * C.DEMAND.IND_PER_COM - ind) * C.DEMAND.SENS, -1, 1)
     return rd, cd, id
 end
 
