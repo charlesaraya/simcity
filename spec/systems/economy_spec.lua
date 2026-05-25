@@ -106,6 +106,27 @@ describe("Economy", function()
         end)
     end)
 
+    describe("budget", function()
+        -- A read-only forecast for the HUD: recurring income/expense for the
+        -- current city. net must agree with compute (single source of formula).
+        it("reports zero for an empty city", function()
+            local w = World.new(1)
+            local b = Economy.budget(w)
+            assert.are.same({ income = 0, expense = 0, net = 0 }, b)
+        end)
+
+        it("income = job tax, expense = per-building upkeep, net = income - expense", function()
+            local w = World.new(1)
+            build(w, 1, 1, C.ZONE.COMMERCIAL)  -- jobs, 1 building
+            build(w, 2, 1, C.ZONE.RESIDENTIAL) -- no jobs, 1 building
+            local b = Economy.budget(w)
+            assert.are.equal(World.jobs(w) * C.ECON.TAX_RATE, b.income)
+            assert.are.equal(World.building_count(w) * C.ECON.UPKEEP, b.expense)
+            assert.are.equal(b.income - b.expense, b.net)
+            assert.are.equal(Economy.compute(World.jobs(w), World.building_count(w)), b.net)
+        end)
+    end)
+
     describe("install (road expense)", function()
         it("debits exactly ROAD.COST when a road is built", function()
             local w = World.new(1)

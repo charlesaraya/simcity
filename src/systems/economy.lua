@@ -16,12 +16,16 @@ local C = require("src.world.constants")
 
 local Economy = {}
 
--- Pure: total jobs and building count -> monthly net delta. Jobs are the tax
--- base; every building costs flat upkeep. May be negative (a jobless,
--- residential-heavy city); the system applies it without clamping (debt is
--- allowed).
+-- Pure: total jobs and building count -> monthly net delta.
 function Economy.compute(jobs, buildings)
     return jobs * C.ECON.TAX_RATE - buildings * C.ECON.UPKEEP
+end
+
+-- Pure read: the recurring monthly budget for the HUD.
+function Economy.budget(world)
+    local income = World.jobs(world) * C.ECON.TAX_RATE
+    local expense = World.building_count(world) * C.ECON.UPKEEP
+    return { income = income, expense = expense, net = income - expense }
 end
 
 function Economy.system()
@@ -36,9 +40,7 @@ function Economy.system()
     }
 end
 
--- The economy's event-driven face: a one-time road expense. Keeping the debit
--- here (not in the world writer or the input layer) preserves the invariant that
--- the economy is the only module that writes treasury.
+-- The economy's event-driven face. The economy is the only module that writes treasury.
 function Economy.install(world)
     Bus.subscribe(C.EVENTS.ROAD_BUILT, function()
         world.treasury = world.treasury - C.ROAD.COST
