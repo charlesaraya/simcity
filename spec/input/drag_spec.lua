@@ -136,3 +136,29 @@ describe("Drag road validity + cost", function()
         end)
     end)
 end)
+
+describe("Drag zone cost", function()
+    local RES = C.ZONE.RESIDENTIAL
+
+    it("charges per tile that actually changes zone", function()
+        local w = World.new(1)
+        local tiles = Drag.zone_rect(w, 2, 2, 3, 3) -- 4 grass tiles
+        assert.are.equal(4 * C.ZONE_COST[RES], Drag.zone_cost(w, tiles, RES))
+    end)
+
+    it("skips tiles already in the target zone (re-zone is free)", function()
+        local w = World.new(1)
+        World.zone_tile(w, 2, 2, RES) -- already RES
+        local tiles = Drag.zone_rect(w, 2, 2, 3, 3) -- still 4 tiles (no roads)
+        assert.are.equal(3 * C.ZONE_COST[RES], Drag.zone_cost(w, tiles, RES))
+    end)
+
+    it("zone_affordable reflects the changed-tile cost", function()
+        local w = World.new(1)
+        local tiles = Drag.zone_rect(w, 2, 2, 3, 3)
+        w.treasury = 4 * C.ZONE_COST[RES]
+        assert.is_true(Drag.zone_affordable(w, tiles, RES))
+        w.treasury = w.treasury - 1
+        assert.is_false(Drag.zone_affordable(w, tiles, RES))
+    end)
+end)

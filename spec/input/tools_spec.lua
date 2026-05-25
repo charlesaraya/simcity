@@ -4,8 +4,11 @@
 
 local Tools = require("src.input.tools")
 local World = require("src.world.world")
+local Drag = require("src.input.drag")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
+
+local function tile_at(w, x, y) return w.grid.tiles[w.grid.width * (y - 1) + x] end
 
 describe("Tools", function()
     before_each(function() Bus.clear() end)
@@ -41,6 +44,48 @@ describe("Tools", function()
     it("returns false for an unknown tool", function()
         local w = World.new(1)
         assert.is_false(Tools.apply(999, w, 2, 2))
+    end)
+
+    describe("drag commit (all-or-nothing)", function()
+        it("apply_run builds the whole road run when affordable", function()
+            local w = World.new(1)
+            local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
+            assert.is_true(Tools.apply_run(w, run))
+            for _, t in ipairs(run) do assert.is_true(tile_at(w, t.x, t.y).road) end
+        end)
+
+        it("apply_run builds nothing when unaffordable", function()
+            local w = World.new(1)
+            w.treasury = 3 * C.ROAD.COST -- need 4
+            local run = Drag.road_run(2, 2, 5, 2)
+            assert.is_false(Tools.apply_run(w, run))
+            for _, t in ipairs(run) do assert.is_nil(tile_at(w, t.x, t.y).road) end
+        end)
+
+        it("apply_run builds nothing when the run crosses a zone", function()
+            local w = World.new(1)
+            World.zone_tile(w, 3, 2, C.ZONE.RESIDENTIAL)
+            local run = Drag.road_run(2, 2, 5, 2)
+            assert.is_false(Tools.apply_run(w, run))
+            assert.is_nil(tile_at(w, 2, 2).road)
+        end)
+
+        it("apply_rect zones the whole rectangle when affordable", function()
+            local w = World.new(1)
+            local tiles = Drag.zone_rect(w, 2, 2, 3, 3)
+            assert.is_true(Tools.apply_rect(C.TOOL.ZONE_RES, w, tiles))
+            for _, t in ipairs(tiles) do
+                assert.are.equal(C.ZONE.RESIDENTIAL, tile_at(w, t.x, t.y).zone)
+            end
+        end)
+
+        it("apply_rect zones nothing when unaffordable", function()
+            local w = World.new(1)
+            local tiles = Drag.zone_rect(w, 2, 2, 3, 3) -- 4 tiles
+            w.treasury = 3 * C.ZONE_COST[C.ZONE.RESIDENTIAL]
+            assert.is_false(Tools.apply_rect(C.TOOL.ZONE_RES, w, tiles))
+            assert.are.equal(C.ZONE.NONE, tile_at(w, 2, 2).zone)
+        end)
     end)
 
     describe("zoning affordability gate", function()

@@ -71,4 +71,19 @@ function Drag.road_affordable(world, run)
     return world.treasury >= Drag.road_cost(world, run)
 end
 
+-- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in
+-- the target zone (or roads) are no-ops at commit, so they aren't charged.
+function Drag.zone_cost(world, tiles, zone)
+    local n = 0
+    for _, t in ipairs(tiles) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if tile and not tile.road and tile.zone ~= zone then n = n + 1 end
+    end
+    return n * C.ZONE_COST[zone]
+end
+
+function Drag.zone_affordable(world, tiles, zone)
+    return world.treasury >= Drag.zone_cost(world, tiles, zone)
+end
+
 return Drag
