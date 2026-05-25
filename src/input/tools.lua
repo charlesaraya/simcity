@@ -10,7 +10,8 @@ local C = require("src.world.constants")
 
 local Tools = {}
 
--- Which zone each zone tool paints. Shared by the single-tile and rectangle paths.
+-- Which zone each zone tool paints.
+-- Shared by the single-tile and rectangle paths.
 local ZONE_OF = {
     [C.TOOL.ZONE_RES] = C.ZONE.RESIDENTIAL,
     [C.TOOL.ZONE_COM] = C.ZONE.COMMERCIAL,
