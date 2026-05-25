@@ -6,6 +6,9 @@
 
 local Roads = require("src.systems.roads")
 local Grid = require("src.world.grid")
+local World = require("src.world.world")
+local Bus = require("src.bus")
+local C = require("src.world.constants")
 
 -- Lay roads at the given {x, y} pairs on a fresh w*h grass grid.
 local function grid_with_roads(w, h, cells)
@@ -59,5 +62,57 @@ describe("Roads.compute", function()
         -- One road tile on each edge of a 5x5 grid, each isolated.
         local grid = grid_with_roads(5, 5, { { 1, 3 }, { 5, 3 }, { 3, 1 }, { 3, 5 } })
         assert.are.same({ "1,3", "3,1", "3,5", "5,3" }, connected_coords(grid, Roads.compute(grid)))
+    end)
+end)
+
+describe("Roads.install", function()
+    before_each(function() Bus.clear() end)
+
+    it("populates the cache from pre-laid roads at install time", function()
+        -- A road laid on the grid BEFORE install (e.g. as if loaded from a save).
+        local w = World.new(1)
+        Grid.get(w.grid, 1, 3).road = true -- x=1 is the map edge
+        Roads.install(w)
+        assert.is_true(w.roads.connected[Grid.idx(w.grid, 1, 3)])
+    end)
+
+    it("recomputes when a road is built after install", function()
+        local w = World.new(1)
+        Roads.install(w)
+        assert.are.same({}, w.roads.connected)
+        World.build_road(w, 1, 3)
+        assert.is_true(w.roads.connected[Grid.idx(w.grid, 1, 3)])
+    end)
+
+    it("recomputes when a road is bulldozed", function()
+        local w = World.new(1)
+        Roads.install(w)
+        World.build_road(w, 1, 3)
+        World.bulldoze(w, 1, 3)
+        assert.are.same({}, w.roads.connected)
+    end)
+end)
+
+describe("Roads.building_connected", function()
+    before_each(function() Bus.clear() end)
+
+    it("is true for a tile adjacent to a connected (edge-reaching) road", function()
+        local w = World.new(1)
+        Roads.install(w)
+        World.build_road(w, 1, 3) -- edge road, connected
+        assert.is_true(Roads.building_connected(w, 2, 3))
+    end)
+
+    it("is false for a tile adjacent only to an isolated interior road", function()
+        local w = World.new(1)
+        Grid.get(w.grid, 10, 10).road = true -- interior, never reaches an edge
+        Roads.install(w)
+        assert.is_false(Roads.building_connected(w, 11, 10))
+    end)
+
+    it("is false when there are no roads at all", function()
+        local w = World.new(1)
+        Roads.install(w)
+        assert.is_false(Roads.building_connected(w, 5, 5))
     end)
 end)

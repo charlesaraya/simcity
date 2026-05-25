@@ -5,6 +5,8 @@
 -- nothing.
 
 local Grid = require("src.world.grid")
+local Bus = require("src.bus")
+local C = require("src.world.constants")
 
 local Roads = {}
 
@@ -42,6 +44,29 @@ function Roads.compute(grid)
     end
 
     return connected
+end
+
+-- Event-driven, like zoning: recompute the cache only when roads change. The
+-- recompute runs once at install time too, so a fresh game gets an empty cache
+-- and a loaded game rebuilds its cache from the saved road tiles.
+function Roads.install(world)
+    local function recompute()
+        world.roads.connected = Roads.compute(world.grid)
+    end
+    Bus.subscribe(C.EVENTS.ROAD_BUILT, recompute)
+    Bus.subscribe(C.EVENTS.ROAD_REMOVED, recompute)
+    recompute()
+end
+
+-- READ: is (x, y) served by the network? True if any 4-neighbor is a road tile
+-- that reaches a map edge.
+function Roads.building_connected(world, x, y)
+    for _, n in ipairs(Grid.neighbors(world.grid, x, y)) do
+        if world.roads.connected[Grid.idx(world.grid, n.x, n.y)] then
+            return true
+        end
+    end
+    return false
 end
 
 return Roads
