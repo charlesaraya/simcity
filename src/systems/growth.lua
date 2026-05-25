@@ -12,6 +12,7 @@
 local World = require("src.world.world")
 local RNG = require("src.sim.rng")
 local Grid = require("src.world.grid")
+local Roads = require("src.systems.roads")
 local C = require("src.world.constants")
 
 local Growth = {}
@@ -31,23 +32,32 @@ function Growth.system()
             Grid.each(world.grid, function(x, y, tile)
                 if tile.zone == C.ZONE.NONE then return end
                 local d = demand_for(world, tile.zone)
+                local connected = Roads.building_connected(world, x, y)
 
                 if not tile.building then
-                    -- Empty zoned tile: roll to start, chance proportional to demand.
-                    if d > 0 and RNG.chance(world.rng, d * C.GROWTH.RATE) then
+                    -- Empty zoned tile: needs demand AND road access to start.
+                    if d > 0 and connected and RNG.chance(world.rng, d * C.GROWTH.RATE) then
                         World.start_building(world, x, y)
                     end
                 elseif tile.building.state == C.BUILD.CONSTRUCTING then
-                    -- Progress is internal building data, not a state change others
-                    -- react to, so it's a direct write (no event/writer needed).
-                    tile.building.progress = tile.building.progress + 1
-                    if tile.building.progress >= C.GROWTH.CONSTRUCTION_TICKS then
-                        World.complete_building(world, x, y)
+                    if not connected then
+                        -- Access lost mid-build: halt and roll to abandon the site.
+                        if RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
+                            World.abandon_building(world, x, y)
+                        end
+                    else
+                        -- Progress is internal building data.
+                        tile.building.progress = tile.building.progress + 1
+                        if tile.building.progress >= C.GROWTH.CONSTRUCTION_TICKS then
+                            World.complete_building(world, x, y)
+                        end
                     end
                 else
-                    -- Completed: abandon only when demand has truly collapsed.
+                    -- Abandon a completed building on a true demand collapse, or on lost road.
                     if d < C.GROWTH.ABANDON_THRESHOLD
                         and RNG.chance(world.rng, -d * C.GROWTH.ABANDON_RATE) then
+                        World.abandon_building(world, x, y)
+                    elseif not connected and RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
                         World.abandon_building(world, x, y)
                     end
                 end

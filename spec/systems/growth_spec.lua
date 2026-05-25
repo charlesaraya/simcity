@@ -4,6 +4,7 @@
 
 local Growth = require("src.systems.growth")
 local World = require("src.world.world")
+local Roads = require("src.systems.roads")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
 
@@ -14,6 +15,15 @@ local function zone_patch(w, n, zone)
             World.zone_tile(w, x, y, zone)
         end
     end
+end
+
+-- Lay a connected road column down the left edge (x=1, rows 1..n) and install
+-- the roads system. Call BEFORE zone_patch: the x=1 tiles become road (zoning
+-- then skips them), leaving the x=2 column adjacent to a connected road so it
+-- can grow under the connectivity gate.
+local function connect_left_edge(w, n)
+    for y = 1, n do World.build_road(w, 1, y) end
+    Roads.install(w)
 end
 
 describe("Growth", function()
@@ -34,6 +44,7 @@ describe("Growth", function()
 
     it("grows buildings on zoned tiles when demand is positive", function()
         local w = World.new(1)
+        connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.RESIDENTIAL)
         w.demand.residential = 0.8
         local g = Growth.system()
@@ -43,6 +54,7 @@ describe("Growth", function()
 
     it("grows industrial buildings on zoned tiles when demand is positive", function()
         local w = World.new(1)
+        connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.INDUSTRIAL)
         w.demand.industrial = 0.8
         local g = Growth.system()
@@ -52,6 +64,8 @@ describe("Growth", function()
 
     it("takes CONSTRUCTION_TICKS months to complete a building", function()
         local w = World.new(1)
+        World.build_road(w, 2, 1) -- edge road so (1,1) is road-connected
+        Roads.install(w)
         World.zone_tile(w, 1, 1, C.ZONE.RESIDENTIAL)
         World.start_building(w, 1, 1) -- force a construction site
         local g = Growth.system()
@@ -70,10 +84,59 @@ describe("Growth", function()
         assert.are.equal(0, World.count_buildings(w, C.ZONE.COMMERCIAL))
     end)
 
+    describe("road connectivity gate", function()
+        it("never builds on a zoned tile with no road access", function()
+            local w = World.new(1)
+            zone_patch(w, 8, C.ZONE.RESIDENTIAL) -- no roads laid anywhere
+            w.demand.residential = 0.8
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+
+        it("builds once a connecting road exists", function()
+            local w = World.new(1)
+            connect_left_edge(w, 8) -- road at x=1; x=2 column becomes connected
+            zone_patch(w, 8, C.ZONE.RESIDENTIAL)
+            w.demand.residential = 0.8
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
+        end)
+
+        it("abandons a completed building that loses road access", function()
+            local w = World.new(1)
+            World.build_road(w, 2, 1) -- edge road, connected
+            Roads.install(w)
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL) -- adjacent to the road
+            World.start_building(w, 2, 2)
+            World.complete_building(w, 2, 2)
+            w.demand.residential = 0.5 -- positive: NOT a demand-collapse abandon
+            World.bulldoze(w, 2, 1)    -- sever the only link -> recompute
+            local g = Growth.system()
+            for _ = 1, 200 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+
+        it("abandons a constructing building that loses road access", function()
+            local w = World.new(1)
+            World.build_road(w, 2, 1)
+            Roads.install(w)
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 2, 2) -- left constructing
+            w.demand.residential = 0.5
+            World.bulldoze(w, 2, 1)
+            local g = Growth.system()
+            for _ = 1, 200 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+    end)
+
     it("is deterministic: same seed yields the same city", function()
         local function run(seed)
             Bus.clear()
             local w = World.new(seed)
+            connect_left_edge(w, 10)
             zone_patch(w, 10, C.ZONE.RESIDENTIAL)
             w.demand.residential = 0.8
             local g = Growth.system()

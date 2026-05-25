@@ -8,6 +8,7 @@
 local Save = require("src.persistence.save")
 local World = require("src.world.world")
 local Growth = require("src.systems.growth")
+local Roads = require("src.systems.roads")
 local RNG = require("src.sim.rng")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
@@ -49,6 +50,8 @@ describe("Save", function()
     it("reloaded world replays identical growth", function()
         local function seeded()
             local w = World.new(2024)
+            for y = 1, 8 do World.build_road(w, 1, y) end -- connected left-edge road
+            Roads.install(w)
             for x = 1, 8 do
                 for y = 1, 8 do World.zone_tile(w, x, y, C.ZONE.RESIDENTIAL) end
             end
