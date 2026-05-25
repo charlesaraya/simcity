@@ -22,33 +22,36 @@ function World.new(seed)
         grid = Grid.new(),
         rng = RNG.new(seed),
         demand = { residential = 0, commercial = 0, industrial = 0 },
-        clock = { months = 0 }, -- elapsed sim-months; the clock system advances it
+        clock = { months = 0 },           -- elapsed sim-months; the clock system advances it
         treasury = C.ECON.START_TREASURY, -- city funds; the economy moves this
-        economy = { last_net = 0 },        -- last month's net delta, for the HUD
-        -- Derived road-connectivity cache (the roads system fills `connected`
-        -- with the indices of road tiles reaching a map edge). Rebuilt from the
-        -- grid on install/load, so a stale serialized copy can't desync it.
-        roads = { connected = {} },
+        economy = { last_net = 0 },       -- last month's net delta, for the HUD
+        roads = { connected = {} },       -- Derived road-connectivity cache
     }
 end
 
--- WRITE: designate a tile's zone. Idempotent -- zoning a tile to the zone it
--- already has is a no-op (no event), so hold-to-paint never spams events or
--- re-triggers consequences. Publishes tile_zoned only on an actual change.
+-- WRITE: designate a tile's zone. Idempotent: re-zoning is a no-op (no event);
+-- hold-to-paint never spams events. Refuses a road tile -- bulldoze clears roads.
 function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
+    if tile.road then return false end
     if tile.zone == zone then return false end
     tile.zone = zone
     Bus.publish(C.EVENTS.TILE_ZONED, { x = x, y = y, zone = zone })
     return true
 end
 
--- WRITE: clear a tile back to unzoned grass, removing any building.
--- Publishes tile_bulldozed.
+-- WRITE: clear a tile back to plain grass. A road tile clears the road and
+-- publishes road_removed (so the roads system recomputes); any other tile clears
+-- zone + building and publishes tile_bulldozed. Road/zone are mutually exclusive.
 function World.bulldoze(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
+    if tile.road then
+        tile.road = nil
+        Bus.publish(C.EVENTS.ROAD_REMOVED, { x = x, y = y })
+        return true
+    end
     tile.zone = C.ZONE.NONE
     tile.building = nil
     Bus.publish(C.EVENTS.TILE_BULLDOZED, { x = x, y = y })
@@ -56,10 +59,9 @@ function World.bulldoze(world, x, y)
 end
 
 -- WRITE: lay a road on a tile. Roads are mutually exclusive with zones and
--- buildings, so this only succeeds on plain, unzoned grass -- otherwise it's a
--- no-op (the player must bulldoze first). Publishes road_built so the roads
--- system can recompute connectivity. Idempotent: re-roading a road tile is a
--- no-op (no event), so hold-to-paint never re-fires.
+-- buildings, so this only succeeds on plain, unzoned grass, otherwise it's a
+-- no-op. Publishes road_built so the roads system can recompute connectivity.
+-- Idempotent: re-roading is a no-op (no event), hold-to-paint never re-fires.
 function World.build_road(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
@@ -69,8 +71,8 @@ function World.build_road(world, x, y)
     return true
 end
 
--- WRITE: begin construction on a tile. No event yet -- the building doesn't
--- contribute until it completes. (Growth calls this, then completes it later.)
+-- WRITE: begin construction on a tile. No event yet; the building doesn't
+-- contribute until it completes.
 function World.start_building(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
@@ -78,7 +80,7 @@ function World.start_building(world, x, y)
     return true
 end
 
--- WRITE: finish construction. Publishes building_constructed (now it counts).
+-- WRITE: finish construction.
 function World.complete_building(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not (tile and tile.building) then return false end
@@ -87,8 +89,7 @@ function World.complete_building(world, x, y)
     return true
 end
 
--- WRITE: remove a building (demand collapsed, hostile conditions, etc).
--- Publishes building_abandoned, carrying the zone it vacated.
+-- WRITE: remove a building.
 function World.abandon_building(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not (tile and tile.building) then return false end
@@ -119,7 +120,7 @@ function World.population(world)
 end
 
 -- READ: total jobs = completed commercial + industrial buildings, each scaled by
--- its per-zone job count. Both zones employ; only residential houses.
+-- its per-zone job count.
 function World.jobs(world)
     local com = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
     local ind = World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
@@ -127,8 +128,7 @@ function World.jobs(world)
 end
 
 -- READ: total completed buildings across every zone. The economy pays upkeep
--- per building regardless of kind, so it needs this gross count. A zone-less
--- count_buildings call -- one scan, no duplicated walk logic.
+-- per building regardless of kind, so it needs this gross count.
 function World.building_count(world)
     return World.count_buildings(world, nil, C.BUILD.COMPLETE)
 end
