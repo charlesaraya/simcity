@@ -4,8 +4,16 @@
 -- bounding rectangle minus any road tiles.
 
 local Grid = require("src.world.grid")
+local C = require("src.world.constants")
 
 local Drag = {}
+
+-- A run tile is buildable iff it's plain grass: in-bounds, unzoned, no building,
+-- not already a road. Existing roads are skipped.
+local function buildable(world, t)
+    local tile = Grid.get(world.grid, t.x, t.y)
+    return tile and not tile.road and tile.zone == C.ZONE.NONE and not tile.building
+end
 
 -- Axis-only run from (x0,y0) to (x1,y1): a single straight line along whichever
 -- axis the drag moved further on (ties go horizontal). Inclusive of both ends;
@@ -36,6 +44,31 @@ function Drag.zone_rect(world, x0, y0, x1, y1)
         end
     end
     return tiles
+end
+
+-- A road run is valid unless it leaves the grid or crosses a zone/building.
+-- Existing roads are fine (they'll be skipped at build time).
+function Drag.road_run_valid(world, run)
+    for _, t in ipairs(run) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if not tile then return false end -- off-grid
+        if tile.zone ~= C.ZONE.NONE or tile.building then return false end
+    end
+    return true
+end
+
+-- Cost = ROAD.COST per grass tile that will actually be built. Existing roads in
+-- the run are transparent and not charged.
+function Drag.road_cost(world, run)
+    local n = 0
+    for _, t in ipairs(run) do
+        if buildable(world, t) then n = n + 1 end
+    end
+    return n * C.ROAD.COST
+end
+
+function Drag.road_affordable(world, run)
+    return world.treasury >= Drag.road_cost(world, run)
 end
 
 return Drag
