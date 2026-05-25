@@ -35,6 +35,8 @@ C.COLOR        = {
     BUILD_COM     = { 0.45, 0.70, 0.95 }, -- completed commercial
     BUILD_IND     = { 0.92, 0.78, 0.30 }, -- completed industrial (bright amber)
     BUILD_PENDING = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
+
+    ROAD          = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
 }
 
 -- Camera tuning.
@@ -116,6 +118,15 @@ C.TOOL         = {
     ZONE_RES = 2,
     ZONE_COM = 3,
     ZONE_IND = 4,
+    ROAD     = 5,
+}
+
+-- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep);
+-- the input layer blocks placement when the treasury can't cover it, and the
+-- economy debits it on road_built. First-pass like DEMAND/GROWTH -- tune later.
+-- START_TREASURY (1000) / COST (10) = a 100-tile starter network before debt.
+C.ROAD         = {
+    COST = 10,
 }
 
 -- Event names published by world-state writers (Principle 4).
@@ -125,6 +136,8 @@ C.EVENTS       = {
     BUILDING_CONSTRUCTED = "building_constructed",
     BUILDING_ABANDONED   = "building_abandoned",
     MONTH_ELAPSED        = "month_elapsed",
+    ROAD_BUILT           = "road_built",
+    ROAD_REMOVED         = "road_removed",
 }
 
 return C
