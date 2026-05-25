@@ -11,6 +11,7 @@
 -- required ZERO edits to demand, growth, zoning, or the world writers.
 
 local World = require("src.world.world")
+local Bus = require("src.bus")
 local C = require("src.world.constants")
 
 local Economy = {}
@@ -33,6 +34,16 @@ function Economy.system()
             world.economy.last_net = net
         end,
     }
+end
+
+-- The economy's event-driven face: a one-time road expense. Keeping the debit
+-- here (not in the world writer or the input layer) preserves the invariant that
+-- the economy is the only module that writes treasury. No upkeep, no refund --
+-- only road_built moves money, road_removed does not.
+function Economy.install(world)
+    Bus.subscribe(C.EVENTS.ROAD_BUILT, function()
+        world.treasury = world.treasury - C.ROAD.COST
+    end)
 end
 
 return Economy

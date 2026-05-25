@@ -105,4 +105,33 @@ describe("Economy", function()
             assert.are.equal(-50, w.treasury)
         end)
     end)
+
+    describe("install (road expense)", function()
+        it("debits exactly ROAD.COST when a road is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_road(w, 2, 2)
+            assert.are.equal(before - C.ROAD.COST, w.treasury)
+        end)
+
+        it("debits once per road built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_road(w, 2, 2)
+            World.build_road(w, 3, 2)
+            assert.are.equal(before - 2 * C.ROAD.COST, w.treasury)
+        end)
+
+        it("leaves the monthly tick income unchanged", function()
+            local w = World.new(1)
+            Economy.install(w)
+            build(w, 1, 1, C.ZONE.INDUSTRIAL)
+            local expected = Economy.compute(World.jobs(w), World.building_count(w))
+            local before = w.treasury
+            Economy.system().tick(w)
+            assert.are.equal(before + expected, w.treasury)
+        end)
+    end)
 end)
