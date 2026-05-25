@@ -18,6 +18,7 @@ local Economy = require("src.systems.economy")
 local Zoning = require("src.systems.zoning")
 local Roads = require("src.systems.roads")
 local Tools = require("src.input.tools")
+local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
 local Iso = require("src.render.iso")
 local Renderer = require("src.render.renderer")
@@ -27,6 +28,25 @@ local Save = require("src.persistence.save")
 local world, cam, runner
 local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
+
+-- Tile coords where the current drag began (nil when not dragging). Roads and
+-- zones build on press/drag/release; bulldoze stays hold-to-paint.
+local drag_start = nil
+
+local ZONE_OF = {
+    [C.TOOL.ZONE_RES] = C.ZONE.RESIDENTIAL,
+    [C.TOOL.ZONE_COM] = C.ZONE.COMMERCIAL,
+    [C.TOOL.ZONE_IND] = C.ZONE.INDUSTRIAL,
+}
+local ZONE_PREVIEW_COLOR = {
+    [C.ZONE.RESIDENTIAL] = C.COLOR.ZONE_RES,
+    [C.ZONE.COMMERCIAL]  = C.COLOR.ZONE_COM,
+    [C.ZONE.INDUSTRIAL]  = C.COLOR.ZONE_IND,
+}
+
+local function is_drag_tool(tool)
+    return tool == C.TOOL.ROAD or ZONE_OF[tool] ~= nil
+end
 
 -- Transient HUD status ("Saved"/"Loaded"), cleared after a short while.
 local status_msg, status_until = nil, 0
@@ -42,8 +62,8 @@ end
 local function wire_world(w)
     Bus.clear()
     Zoning.install(w)
-    Roads.install(w)    -- recomputes the connectivity cache from the grid (on load too)
-    Economy.install(w)  -- subscribes the one-time road-cost debit
+    Roads.install(w)   -- recomputes the connectivity cache from the grid (on load too)
+    Economy.install(w) -- subscribes the one-time road-cost debit
 end
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
@@ -54,6 +74,22 @@ local function hovered_tile()
     local tx, ty = Iso.screen_to_tile(wx, wy)
     if Grid.in_bounds(world.grid, tx, ty) then return tx, ty end
     return nil
+end
+
+-- Given the cursor tile during an active drag, return the preview overlay
+-- and its live cost. Roads preview an axis-only run; zones preview the
+-- bounding rectangle.
+local function current_drag(cx, cy)
+    local sx, sy = drag_start.x, drag_start.y
+    if current_tool == C.TOOL.ROAD then
+        local run = Drag.road_run(sx, sy, cx, cy)
+        local valid = Drag.road_run_valid(world, run) and Drag.road_affordable(world, run)
+        return { tiles = run, color = C.COLOR.PREVIEW_ROAD, valid = valid }, Drag.road_cost(world, run)
+    end
+    local zone = ZONE_OF[current_tool]
+    local tiles = Drag.zone_rect(world, sx, sy, cx, cy)
+    local valid = Drag.zone_affordable(world, tiles, zone)
+    return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = valid }, Drag.zone_cost(world, tiles, zone)
 end
 
 function love.load()
@@ -74,10 +110,11 @@ end
 function love.update(dt)
     Camera.update(cam, dt) -- WASD pan
 
-    -- Hold primary button to paint the hovered tile (tap = one, drag = many).
-    if love.mouse.isDown(1) then
+    -- Bulldoze paints on hold (tap = one, drag = many). Roads and zones instead
+    -- build on release via a drag preview (see mousepressed/mousereleased).
+    if current_tool == C.TOOL.BULLDOZE and love.mouse.isDown(1) then
         local tx, ty = hovered_tile()
-        if tx then Tools.apply(current_tool, world, tx, ty) end
+        if tx then Tools.apply(C.TOOL.BULLDOZE, world, tx, ty) end
     end
 
     -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
@@ -86,9 +123,13 @@ end
 
 function love.draw()
     local tx, ty = hovered_tile()
-    Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil)
+    local preview, drag_cost
+    if drag_start and tx then
+        preview, drag_cost = current_drag(tx, ty)
+    end
+    Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview)
     local msg = (love.timer.getTime() < status_until) and status_msg or nil
-    Hud.draw(world, { tool = current_tool, speed = speed, status = msg })
+    Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost })
 end
 
 function love.keypressed(key)
@@ -124,6 +165,29 @@ function love.keypressed(key)
             flash("No save")
         end
     end
+end
+
+-- Begin a road/zone drag: anchor on the tile under the cursor (in tile coords,
+-- so panning mid-drag doesn't move the anchor). Bulldoze isn't a drag tool.
+function love.mousepressed(_x, _y, button)
+    if button ~= 1 or not is_drag_tool(current_tool) then return end
+    local tx, ty = hovered_tile()
+    if tx then drag_start = { x = tx, y = ty } end
+end
+
+-- Commit the drag on release. apply_run/apply_rect are all-or-nothing and
+-- self-validating, so an invalid/unaffordable drag is a safe no-op.
+function love.mousereleased(_x, _y, button)
+    if button ~= 1 or not drag_start then return end
+    local cx, cy = hovered_tile()
+    if cx then
+        if current_tool == C.TOOL.ROAD then
+            Tools.apply_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
+        else
+            Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
+        end
+    end
+    drag_start = nil
 end
 
 -- Wheel notches drive cursor-anchored zoom (two-finger trackpad scroll).

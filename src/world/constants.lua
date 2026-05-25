@@ -19,24 +19,28 @@ C.TILE         = {
 -- Colors as {r, g, b} in 0..1 (LÖVE's range). The checkerboard alternates these
 -- so we can SEE individual tiles and catch picking bugs.
 C.COLOR        = {
-    GRASS_A       = { 0.42, 0.60, 0.36 },
-    GRASS_B       = { 0.38, 0.55, 0.33 },
-    TILE_LINE     = { 0.20, 0.28, 0.18 }, -- diamond outline
-    HIGHLIGHT     = { 1.00, 0.95, 0.50 }, -- tile under cursor
-    BG            = { 0.10, 0.11, 0.13 },
+    GRASS_A         = { 0.42, 0.60, 0.36 },
+    GRASS_B         = { 0.38, 0.55, 0.33 },
+    TILE_LINE       = { 0.20, 0.28, 0.18 }, -- diamond outline
+    HIGHLIGHT       = { 1.00, 0.95, 0.50 }, -- tile under cursor
+    BG              = { 0.10, 0.11, 0.13 },
 
     -- Zoned-but-empty tile tints (so a plan is visible before it grows).
-    ZONE_RES      = { 0.30, 0.45, 0.28 },
-    ZONE_COM      = { 0.26, 0.36, 0.50 },
-    ZONE_IND      = { 0.46, 0.40, 0.20 }, -- dim amber
+    ZONE_RES        = { 0.30, 0.45, 0.28 },
+    ZONE_COM        = { 0.26, 0.36, 0.50 },
+    ZONE_IND        = { 0.46, 0.40, 0.20 }, -- dim amber
 
     -- Building markers drawn on top of a tile.
-    BUILD_RES     = { 0.55, 0.85, 0.45 }, -- completed residential
-    BUILD_COM     = { 0.45, 0.70, 0.95 }, -- completed commercial
-    BUILD_IND     = { 0.92, 0.78, 0.30 }, -- completed industrial (bright amber)
-    BUILD_PENDING = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
+    BUILD_RES       = { 0.55, 0.85, 0.45 }, -- completed residential
+    BUILD_COM       = { 0.45, 0.70, 0.95 }, -- completed commercial
+    BUILD_IND       = { 0.92, 0.78, 0.30 }, -- completed industrial (bright amber)
+    BUILD_PENDING   = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
 
-    ROAD          = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
+    ROAD            = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
+
+    -- Drag-preview overlays (drawn translucent).
+    PREVIEW_ROAD    = { 0.85, 0.78, 0.35 }, -- yellowish shadow
+    PREVIEW_INVALID = { 0.85, 0.30, 0.30 }, -- can't build here / can't afford
 }
 
 -- Camera tuning.

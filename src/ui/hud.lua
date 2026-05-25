@@ -56,6 +56,9 @@ function Hud.draw(world, opts)
     love.graphics.print(("Demand   R %+.2f    C %+.2f    I %+.2f")
         :format(world.demand.residential, world.demand.commercial, world.demand.industrial), 16, 82)
     love.graphics.print(("Tool: %s"):format(TOOL_NAME[opts.tool]), 16, 104)
+    if opts.drag_cost then
+        love.graphics.print(("Cost  %s"):format(money(opts.drag_cost)), 16, 126)
+    end
 
     if opts.status then
         love.graphics.setColor(C.COLOR.HIGHLIGHT)

@@ -32,7 +32,9 @@ local function building_color(tile)
     return C.COLOR.BUILD_PENDING
 end
 
-function Renderer.draw(world, cam, hover)
+-- `preview` (optional) = { tiles = {{x,y}...}, color = {r,g,b}, valid = bool };
+-- a translucent overlay of the tiles a drag would affect, red when invalid.
+function Renderer.draw(world, cam, hover, preview)
     Camera.apply(cam)
 
     Grid.each(world.grid, function(x, y, tile)
@@ -49,6 +51,14 @@ function Renderer.draw(world, cam, hover)
             love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
         end
     end)
+
+    if preview then
+        local col = preview.valid and preview.color or C.COLOR.PREVIEW_INVALID
+        love.graphics.setColor(col[1], col[2], col[3], 0.5)
+        for _, t in ipairs(preview.tiles) do
+            love.graphics.polygon("fill", Iso.tile_corners(t.x, t.y))
+        end
+    end
 
     if hover and Grid.in_bounds(world.grid, hover.x, hover.y) then
         local h = C.COLOR.HIGHLIGHT
