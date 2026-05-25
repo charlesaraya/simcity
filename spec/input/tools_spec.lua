@@ -42,4 +42,37 @@ describe("Tools", function()
         local w = World.new(1)
         assert.is_false(Tools.apply(999, w, 2, 2))
     end)
+
+    describe("ROAD tool", function()
+        local function road_spy()
+            local box = { called = 0 }
+            Bus.subscribe(C.EVENTS.ROAD_BUILT, function() box.called = box.called + 1 end)
+            return box
+        end
+
+        it("lays a road when the treasury can afford it", function()
+            local w = World.new(1)
+            w.treasury = C.ROAD.COST -- exactly enough
+            local spy = road_spy()
+            assert.is_true(Tools.apply(C.TOOL.ROAD, w, 2, 2))
+            assert.is_true(w.grid.tiles[w.grid.width * 1 + 2].road)
+            assert.are.equal(1, spy.called)
+        end)
+
+        it("refuses and lays nothing when the treasury can't afford it", function()
+            local w = World.new(1)
+            w.treasury = C.ROAD.COST - 1 -- one short
+            local spy = road_spy()
+            assert.is_false(Tools.apply(C.TOOL.ROAD, w, 2, 2))
+            assert.is_nil(w.grid.tiles[w.grid.width * 1 + 2].road)
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("does not itself mutate the treasury (the economy debits)", function()
+            local w = World.new(1)
+            w.treasury = 500
+            Tools.apply(C.TOOL.ROAD, w, 2, 2)
+            assert.are.equal(500, w.treasury)
+        end)
+    end)
 end)

@@ -20,6 +20,12 @@ function Tools.apply(tool, world, x, y)
         return World.zone_tile(world, x, y, C.ZONE.COMMERCIAL)
     elseif tool == C.TOOL.ZONE_IND then
         return World.zone_tile(world, x, y, C.ZONE.INDUSTRIAL)
+    elseif tool == C.TOOL.ROAD then
+        -- Affordability gate lives here, not in the economy: the command layer
+        -- refuses to issue a build the city can't pay for. Reads treasury but
+        -- never writes it -- the economy debits on road_built.
+        if world.treasury < C.ROAD.COST then return false end
+        return World.build_road(world, x, y)
     end
     return false
 end
