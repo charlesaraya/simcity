@@ -81,4 +81,52 @@ function Power.compute_topology(world)
     return { component = component, supply = supply }
 end
 
+-- Reads the cached topology, totals each completed building's draw into every
+-- component it borders, then lights a component all-or-nothing. The result is
+-- a set of conducting tile indices that are actually energised.
+--
+-- Demand is the POTENTIAL load of completed buildings computed independently
+-- of the current powered state
+function Power.resolve(world)
+    local grid = world.grid
+    local topo = world.power.topology or { component = {}, supply = {} }
+    local demand = {}
+
+    Grid.each(grid, function(x, y, tile)
+        -- Constructing sites draw nothing.
+        if tile.building and tile.building.state == C.BUILD.COMPLETE then
+            local draw = C.POWER_DRAW[tile.zone] or 0
+            local seen = {} -- a building straddling two components loads each once
+            for _, nb in ipairs(Grid.neighbors(grid, x, y)) do
+                local cid = topo.component[Grid.idx(grid, nb.x, nb.y)]
+                if cid and not seen[cid] then
+                    seen[cid] = true
+                    demand[cid] = (demand[cid] or 0) + draw
+                end
+            end
+        end
+    end)
+
+    local powered = {}
+    for idx, cid in pairs(topo.component) do
+        local sup = topo.supply[cid] or 0
+        if sup > 0 and (demand[cid] or 0) <= sup then
+            powered[idx] = true
+        end
+    end
+
+    world.power.powered = powered
+    return powered
+end
+
+-- READ: is (x, y) served? True if any 4-neighbor is an energised conducting tile.
+function Power.building_powered(world, x, y)
+    for _, nb in ipairs(Grid.neighbors(world.grid, x, y)) do
+        if world.power.powered[Grid.idx(world.grid, nb.x, nb.y)] then
+            return true
+        end
+    end
+    return false
+end
+
 return Power

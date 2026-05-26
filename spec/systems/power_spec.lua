@@ -128,3 +128,127 @@ describe("Power.compute_topology", function()
         end)
     end)
 end)
+
+-- A completed building of `zone` on the tile at (x, y), adjacent to the network.
+local function complete_building(w, x, y, zone)
+    World.zone_tile(w, x, y, zone)
+    World.start_building(w, x, y)
+    World.complete_building(w, x, y)
+end
+
+-- The component id of the conductor at (x, y).
+local function cid_at(w, x, y)
+    return w.power.topology.component[Grid.idx(w.grid, x, y)]
+end
+
+describe("Power.resolve", function()
+    before_each(function() Bus.clear() end)
+
+    -- A small road network with the topology cached, ready for supply tweaks.
+    -- resolve consumes world.power.topology (the eager cache), so these tests set
+    -- supply directly rather than building plants -- plant supply is Step 3's job.
+    local function networked_world()
+        local w = World.new(1)
+        World.build_road(w, 1, 4)
+        World.build_road(w, 2, 4)
+        World.build_road(w, 3, 4)
+        w.power.topology = Power.compute_topology(w)
+        return w
+    end
+
+    it("lights a component when supply covers demand", function()
+        local w = networked_world()
+        local cid = cid_at(w, 1, 4)
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL) -- draws 2, adjacent to road (1,4)
+        complete_building(w, 2, 3, C.ZONE.RESIDENTIAL)
+        complete_building(w, 3, 3, C.ZONE.RESIDENTIAL)
+        w.power.topology.supply[cid] = 6 -- exactly the 3 * 2 draw
+        Power.resolve(w)
+        assert.is_true(Power.building_powered(w, 1, 3))
+        assert.is_true(Power.building_powered(w, 3, 3))
+    end)
+
+    it("blacks out the WHOLE component when demand exceeds supply", function()
+        local w = networked_world()
+        local cid = cid_at(w, 1, 4)
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL)
+        complete_building(w, 2, 3, C.ZONE.RESIDENTIAL)
+        complete_building(w, 3, 3, C.ZONE.RESIDENTIAL)
+        w.power.topology.supply[cid] = 5 -- one MW short of the 6 demand
+        Power.resolve(w)
+        assert.is_false(Power.building_powered(w, 1, 3))
+        assert.is_false(Power.building_powered(w, 2, 3)) -- all dark, not just the marginal one
+        assert.is_false(Power.building_powered(w, 3, 3))
+    end)
+
+    it("sums demand by zone (res 2 + com 3 + ind 5)", function()
+        local w = networked_world()
+        local cid = cid_at(w, 1, 4)
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL) -- 2
+        complete_building(w, 2, 3, C.ZONE.COMMERCIAL)  -- 3
+        complete_building(w, 3, 3, C.ZONE.INDUSTRIAL)  -- 5
+        w.power.topology.supply[cid] = 10              -- exactly 2+3+5
+        Power.resolve(w)
+        assert.is_true(Power.building_powered(w, 2, 3))
+        w.power.topology.supply[cid] = 9 -- one short
+        Power.resolve(w)
+        assert.is_false(Power.building_powered(w, 2, 3))
+    end)
+
+    it("does not count buildings still under construction", function()
+        local w = networked_world()
+        local cid = cid_at(w, 1, 4)
+        World.zone_tile(w, 1, 3, C.ZONE.INDUSTRIAL)
+        World.start_building(w, 1, 3) -- constructing, NOT complete
+        w.power.topology.supply[cid] = 1 -- far below an industrial draw of 5
+        Power.resolve(w)
+        assert.is_true(Power.building_powered(w, 1, 3)) -- still lit: no load from the site
+    end)
+
+    it("never lights a component with no supply, even at zero demand", function()
+        local w = networked_world() -- roads only, no plant => supply 0
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL)
+        Power.resolve(w)
+        assert.is_false(Power.building_powered(w, 1, 3)) -- dead wires, no source
+    end)
+
+    it("is idempotent: resolving twice yields the same powered set (no oscillation)", function()
+        local w = networked_world()
+        local cid = cid_at(w, 1, 4)
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL)
+        w.power.topology.supply[cid] = 10
+        Power.resolve(w)
+        local first = {}
+        for idx in pairs(w.power.powered) do first[idx] = true end
+        Power.resolve(w)
+        assert.are.same(first, w.power.powered)
+    end)
+end)
+
+describe("Power.building_powered", function()
+    before_each(function() Bus.clear() end)
+
+    it("is true for a tile adjacent to a lit conductor", function()
+        local w = World.new(1)
+        World.build_road(w, 1, 4)
+        w.power.topology = Power.compute_topology(w)
+        w.power.topology.supply[cid_at(w, 1, 4)] = 50
+        Power.resolve(w)
+        assert.is_true(Power.building_powered(w, 1, 3))
+    end)
+
+    it("is false for a tile adjacent only to a dark (unsupplied) conductor", function()
+        local w = World.new(1)
+        World.build_road(w, 1, 4)
+        w.power.topology = Power.compute_topology(w) -- supply 0
+        Power.resolve(w)
+        assert.is_false(Power.building_powered(w, 1, 3))
+    end)
+
+    it("is false for a tile with no adjacent conductor", function()
+        local w = World.new(1)
+        w.power.topology = Power.compute_topology(w)
+        Power.resolve(w)
+        assert.is_false(Power.building_powered(w, 30, 30))
+    end)
+end)
