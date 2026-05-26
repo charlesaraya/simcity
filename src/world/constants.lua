@@ -38,6 +38,11 @@ C.COLOR        = {
 
     ROAD            = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
 
+    -- Power network.
+    POWER_LINE      = { 0.55, 0.60, 0.78 }, -- steel-blue cable
+    PLANT           = { 0.48, 0.40, 0.60 }, -- slate-purple, reads as special infra
+    UNPOWERED       = { 0.95, 0.78, 0.20 }, -- amber dotted outline on dark buildings
+
     -- Drag-preview overlays (drawn translucent).
     PREVIEW_ROAD    = { 0.85, 0.78, 0.35 }, -- yellowish shadow
     PREVIEW_INVALID = { 0.85, 0.30, 0.30 }, -- can't build here / can't afford
@@ -128,11 +133,13 @@ C.SPEED        = {
 
 -- Player tools.
 C.TOOL         = {
-    BULLDOZE = 1,
-    ZONE_RES = 2,
-    ZONE_COM = 3,
-    ZONE_IND = 4,
-    ROAD     = 5,
+    BULLDOZE   = 1,
+    ZONE_RES   = 2,
+    ZONE_COM   = 3,
+    ZONE_IND   = 4,
+    ROAD       = 5,
+    POWER_LINE = 6,
+    PLANT      = 7,
 }
 
 -- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep).
@@ -148,6 +155,25 @@ C.ZONE_COST    = {
     [C.ZONE.INDUSTRIAL]  = 40,
 }
 
+-- Power network tuning.
+C.PLANT        = {
+    FOOTPRINT = 2,   -- side length, in tiles (2 => a 2x2 footprint)
+    CAPACITY  = 100, -- MW produced, only when road-connected
+    COST      = 300, -- one-time build cost
+    UPKEEP    = 10,  -- monthly fuel, per plant
+}
+
+C.POWER_LINE   = {
+    COST = 5, -- one-time, per tile; no upkeep (like roads)
+}
+
+-- MW drawn by one completed building of each zone. The zoning mix sizes the grid.
+C.POWER_DRAW   = {
+    [C.ZONE.RESIDENTIAL] = 2,
+    [C.ZONE.COMMERCIAL]  = 3,
+    [C.ZONE.INDUSTRIAL]  = 5,
+}
+
 -- Event names published by world-state writers (Principle 4).
 C.EVENTS       = {
     TILE_ZONED           = "tile_zoned",
@@ -157,6 +183,10 @@ C.EVENTS       = {
     MONTH_ELAPSED        = "month_elapsed",
     ROAD_BUILT           = "road_built",
     ROAD_REMOVED         = "road_removed",
+    PLANT_BUILT          = "plant_built",
+    PLANT_REMOVED        = "plant_removed",
+    POWER_LINE_BUILT     = "power_line_built",
+    POWER_LINE_REMOVED   = "power_line_removed",
 }
 
 return C

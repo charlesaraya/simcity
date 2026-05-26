@@ -121,6 +121,141 @@ describe("World", function()
         end)
     end)
 
+    describe("build_power_line", function()
+        local function tile_at(w, x, y)
+            return w.grid.tiles[w.grid.width * (y - 1) + x]
+        end
+
+        it("lays a power line on plain grass and publishes power_line_built", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.POWER_LINE_BUILT)
+            assert.is_true(World.build_power_line(w, 5, 6))
+            assert.is_true(tile_at(w, 5, 6).power_line)
+            assert.are.equal(1, spy.called)
+            assert.are.same({ x = 5, y = 6 }, spy.data)
+        end)
+
+        it("refuses a road tile and publishes nothing", function()
+            local w = World.new(1)
+            World.build_road(w, 5, 6)
+            local spy = spy_on(C.EVENTS.POWER_LINE_BUILT)
+            assert.is_false(World.build_power_line(w, 5, 6))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses a zoned tile and publishes nothing", function()
+            local w = World.new(1)
+            World.zone_tile(w, 5, 6, C.ZONE.RESIDENTIAL)
+            local spy = spy_on(C.EVENTS.POWER_LINE_BUILT)
+            assert.is_false(World.build_power_line(w, 5, 6))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("is idempotent: re-lining a power-line tile is a no-op", function()
+            local w = World.new(1)
+            World.build_power_line(w, 5, 6)
+            local spy = spy_on(C.EVENTS.POWER_LINE_BUILT)
+            assert.is_false(World.build_power_line(w, 5, 6))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("build_road and zone_tile both refuse a power-line tile", function()
+            local w = World.new(1)
+            World.build_power_line(w, 5, 6)
+            assert.is_false(World.build_road(w, 5, 6))
+            assert.is_false(World.zone_tile(w, 5, 6, C.ZONE.RESIDENTIAL))
+            assert.is_true(tile_at(w, 5, 6).power_line)
+        end)
+
+        it("bulldoze clears a power line and publishes power_line_removed only", function()
+            local w = World.new(1)
+            World.build_power_line(w, 5, 6)
+            local removed = spy_on(C.EVENTS.POWER_LINE_REMOVED)
+            local bulldozed = spy_on(C.EVENTS.TILE_BULLDOZED)
+            local road_removed = spy_on(C.EVENTS.ROAD_REMOVED)
+            assert.is_true(World.bulldoze(w, 5, 6))
+            assert.is_nil(tile_at(w, 5, 6).power_line)
+            assert.are.equal(1, removed.called)
+            assert.are.equal(0, bulldozed.called)
+            assert.are.equal(0, road_removed.called)
+        end)
+    end)
+
+    describe("build_plant (2x2 footprint)", function()
+        local function tile_at(w, x, y)
+            return w.grid.tiles[w.grid.width * (y - 1) + x]
+        end
+        local function idx(w, x, y)
+            return w.grid.width * (y - 1) + x
+        end
+
+        it("occupies a 2x2 footprint: anchor tile + 3 part back-references", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.PLANT_BUILT)
+            assert.is_true(World.build_plant(w, 5, 6))
+            local anchor = idx(w, 5, 6)
+            assert.is_truthy(tile_at(w, 5, 6).plant)         -- anchor
+            assert.are.equal(anchor, tile_at(w, 6, 6).plant_part)
+            assert.are.equal(anchor, tile_at(w, 5, 7).plant_part)
+            assert.are.equal(anchor, tile_at(w, 6, 7).plant_part)
+            assert.are.equal(1, spy.called)
+            assert.are.same({ x = 5, y = 6 }, spy.data)
+        end)
+
+        it("refuses placement when any footprint tile is occupied, leaving all four untouched", function()
+            local w = World.new(1)
+            World.build_road(w, 6, 7) -- one corner blocked
+            local spy = spy_on(C.EVENTS.PLANT_BUILT)
+            assert.is_false(World.build_plant(w, 5, 6))
+            assert.is_nil(tile_at(w, 5, 6).plant)
+            assert.is_nil(tile_at(w, 6, 6).plant_part)
+            assert.is_nil(tile_at(w, 5, 7).plant_part)
+            assert.is_true(tile_at(w, 6, 7).road) -- the road is undisturbed
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses placement when the footprint runs off the grid", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.PLANT_BUILT)
+            assert.is_false(World.build_plant(w, w.grid.width, 6))  -- x+1 off-grid
+            assert.is_false(World.build_plant(w, 6, w.grid.height)) -- y+1 off-grid
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("build_road, build_power_line and zone_tile all refuse a plant or plant_part tile", function()
+            local w = World.new(1)
+            World.build_plant(w, 5, 6)
+            assert.is_false(World.build_road(w, 5, 6))       -- anchor
+            assert.is_false(World.build_power_line(w, 6, 6)) -- part
+            assert.is_false(World.zone_tile(w, 5, 7, C.ZONE.RESIDENTIAL)) -- part
+        end)
+
+        it("bulldoze on the anchor removes all four tiles and publishes plant_removed", function()
+            local w = World.new(1)
+            World.build_plant(w, 5, 6)
+            local removed = spy_on(C.EVENTS.PLANT_REMOVED)
+            local bulldozed = spy_on(C.EVENTS.TILE_BULLDOZED)
+            assert.is_true(World.bulldoze(w, 5, 6))
+            assert.is_nil(tile_at(w, 5, 6).plant)
+            assert.is_nil(tile_at(w, 6, 6).plant_part)
+            assert.is_nil(tile_at(w, 5, 7).plant_part)
+            assert.is_nil(tile_at(w, 6, 7).plant_part)
+            assert.are.equal(1, removed.called)
+            assert.are.same({ x = 5, y = 6 }, removed.data)
+            assert.are.equal(0, bulldozed.called)
+        end)
+
+        it("bulldoze on a part tile removes the whole plant, reporting the anchor", function()
+            local w = World.new(1)
+            World.build_plant(w, 5, 6)
+            local removed = spy_on(C.EVENTS.PLANT_REMOVED)
+            assert.is_true(World.bulldoze(w, 6, 7)) -- the far corner part
+            assert.is_nil(tile_at(w, 5, 6).plant)
+            assert.is_nil(tile_at(w, 6, 7).plant_part)
+            assert.are.same({ x = 5, y = 6 }, removed.data)
+        end)
+    end)
+
     describe("bulldoze", function()
         it("clears zone and building and publishes tile_bulldozed", function()
             local w = World.new(1)
