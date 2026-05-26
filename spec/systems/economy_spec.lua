@@ -42,6 +42,16 @@ describe("Economy", function()
             local ind = Economy.compute(C.JOBS_PER_IND, 1)
             assert.is_true(ind > com)
         end)
+
+        it("charges fuel upkeep per plant", function()
+            assert.are.equal(-C.PLANT.UPKEEP, Economy.compute(0, 0, 1))
+            local expected = 10 * C.ECON.TAX_RATE - 2 * C.ECON.UPKEEP - 3 * C.PLANT.UPKEEP
+            assert.are.equal(expected, Economy.compute(10, 2, 3))
+        end)
+
+        it("treats plants as zero when the arg is omitted (back-compat)", function()
+            assert.are.equal(Economy.compute(50, 10), Economy.compute(50, 10, 0))
+        end)
     end)
 
     describe("system", function()
@@ -95,6 +105,16 @@ describe("Economy", function()
             assert.is_true(w.treasury > before)
         end)
 
+        it("burns monthly fuel for each plant", function()
+            local w = World.new(1)
+            World.build_plant(w, 5, 5) -- a plant, no buildings: pure fuel cost
+            local expected = Economy.compute(World.jobs(w), World.building_count(w), World.plant_count(w))
+            local before = w.treasury
+            Economy.system().tick(w)
+            assert.are.equal(before + expected, w.treasury)
+            assert.are.equal(before - C.PLANT.UPKEEP, w.treasury) -- 1 plant, nothing else
+        end)
+
         it("does not floor the treasury at zero (debt persists)", function()
             -- The economy gates nothing, so debt is allowed: a tick applies its
             -- net without clamping. An empty city nets 0, so a pre-existing
@@ -124,6 +144,15 @@ describe("Economy", function()
             assert.are.equal(World.building_count(w) * C.ECON.UPKEEP, b.expense)
             assert.are.equal(b.income - b.expense, b.net)
             assert.are.equal(Economy.compute(World.jobs(w), World.building_count(w)), b.net)
+        end)
+
+        it("folds plant fuel into the monthly expense", function()
+            local w = World.new(1)
+            World.build_plant(w, 5, 5) -- one plant, no buildings
+            local b = Economy.budget(w)
+            assert.are.equal(C.PLANT.UPKEEP, b.expense)
+            assert.are.equal(-C.PLANT.UPKEEP, b.net)
+            assert.are.equal(Economy.compute(World.jobs(w), World.building_count(w), World.plant_count(w)), b.net)
         end)
     end)
 
@@ -182,6 +211,33 @@ describe("Economy", function()
             local before = w.treasury
             Economy.system().tick(w)
             assert.are.equal(before + expected, w.treasury)
+        end)
+    end)
+
+    describe("install (power expense)", function()
+        it("debits PLANT.COST when a plant is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_plant(w, 2, 2)
+            assert.are.equal(before - C.PLANT.COST, w.treasury)
+        end)
+
+        it("debits POWER_LINE.COST when a power line is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_power_line(w, 2, 2)
+            assert.are.equal(before - C.POWER_LINE.COST, w.treasury)
+        end)
+
+        it("debits once per power line built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_power_line(w, 2, 2)
+            World.build_power_line(w, 3, 2)
+            assert.are.equal(before - 2 * C.POWER_LINE.COST, w.treasury)
         end)
     end)
 end)

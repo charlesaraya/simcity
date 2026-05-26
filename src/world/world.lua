@@ -205,4 +205,13 @@ function World.building_count(world)
     return World.count_buildings(world, nil, C.BUILD.COMPLETE)
 end
 
+-- READ: number of power plants, counted by anchor tile.
+function World.plant_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.plant then n = n + 1 end
+    end)
+    return n
+end
+
 return World

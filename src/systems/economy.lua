@@ -16,15 +16,19 @@ local C = require("src.world.constants")
 
 local Economy = {}
 
--- Pure: total jobs and building count -> monthly net delta.
-function Economy.compute(jobs, buildings)
-    return jobs * C.ECON.TAX_RATE - buildings * C.ECON.UPKEEP
+-- Pure: Monthly net delta.
+function Economy.compute(jobs, buildings, plants)
+    plants = plants or 0
+    return jobs * C.ECON.TAX_RATE
+        - buildings * C.ECON.UPKEEP
+        - plants * C.PLANT.UPKEEP -- Plants burn fuel each month.
 end
 
 -- Pure read: the recurring monthly budget for the HUD.
 function Economy.budget(world)
     local income = World.jobs(world) * C.ECON.TAX_RATE
     local expense = World.building_count(world) * C.ECON.UPKEEP
+        + World.plant_count(world) * C.PLANT.UPKEEP
     return { income = income, expense = expense, net = income - expense }
 end
 
@@ -33,20 +37,28 @@ function Economy.system()
         interval = C.SIM.SECONDS_PER_MONTH,
         accumulator = 0,
         tick = function(world)
-            local net = Economy.compute(World.jobs(world), World.building_count(world))
+            local net = Economy.compute(
+                World.jobs(world), World.building_count(world), World.plant_count(world))
             world.treasury = world.treasury + net
             world.economy.last_net = net
         end,
     }
 end
 
--- The economy's event-driven face. The economy is the only module that writes treasury.
+-- The economy's event-driven face: one-time debits for infrastructure. The
+-- economy is the only module that writes treasury.
 function Economy.install(world)
     Bus.subscribe(C.EVENTS.ROAD_BUILT, function()
         world.treasury = world.treasury - C.ROAD.COST
     end)
     Bus.subscribe(C.EVENTS.TILE_ZONED, function(data)
         world.treasury = world.treasury - C.ZONE_COST[data.zone]
+    end)
+    Bus.subscribe(C.EVENTS.POWER_LINE_BUILT, function()
+        world.treasury = world.treasury - C.POWER_LINE.COST
+    end)
+    Bus.subscribe(C.EVENTS.PLANT_BUILT, function()
+        world.treasury = world.treasury - C.PLANT.COST
     end)
 end
 
