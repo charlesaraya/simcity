@@ -252,3 +252,101 @@ describe("Power.building_powered", function()
         assert.is_false(Power.building_powered(w, 30, 30))
     end)
 end)
+
+describe("Power.install", function()
+    before_each(function() Bus.clear() end)
+
+    -- Power.install must follow Roads.install so the plant-supply gate reads a
+    -- fresh road-connectivity cache (Bus fires handlers in subscription order).
+    local function install_utilities(w)
+        Roads.install(w)
+        Power.install(w)
+    end
+
+    it("rebuilds the topology cache from the grid at install (the load path)", function()
+        local w = World.new(1)
+        World.build_road(w, 1, 4) -- laid before any install, as if loaded from a save
+        World.build_road(w, 2, 4)
+        World.build_plant(w, 2, 5)
+        assert.are.same({}, w.power.topology) -- nothing derived yet
+        install_utilities(w)
+        assert.is_not_nil(w.power.topology.component[Grid.idx(w.grid, 1, 4)])
+        assert.are.equal(C.PLANT.CAPACITY, supply_at(w.power.topology, w.grid, 2, 5))
+    end)
+
+    it("recomputes topology when a road is built after install", function()
+        local w = World.new(1)
+        install_utilities(w)
+        assert.is_nil(w.power.topology.component[Grid.idx(w.grid, 1, 4)])
+        World.build_road(w, 1, 4)
+        assert.is_not_nil(w.power.topology.component[Grid.idx(w.grid, 1, 4)])
+    end)
+
+    it("recomputes topology when a power line is built or removed", function()
+        local w = World.new(1)
+        install_utilities(w)
+        World.build_power_line(w, 5, 5)
+        assert.is_not_nil(w.power.topology.component[Grid.idx(w.grid, 5, 5)])
+        World.bulldoze(w, 5, 5)
+        assert.is_nil(w.power.topology.component[Grid.idx(w.grid, 5, 5)])
+    end)
+
+    it("recomputes topology when a plant is built or removed", function()
+        local w = World.new(1)
+        install_utilities(w)
+        World.build_plant(w, 5, 5)
+        assert.is_not_nil(w.power.topology.component[Grid.idx(w.grid, 5, 5)])
+        World.bulldoze(w, 6, 6) -- a footprint corner; clears the whole plant
+        assert.is_nil(w.power.topology.component[Grid.idx(w.grid, 5, 5)])
+    end)
+
+    it("re-evaluates plant supply when a road changes (roads conduct power)", function()
+        local w = World.new(1)
+        install_utilities(w)
+        World.build_plant(w, 5, 5) -- no road yet => unmanned => 0 supply
+        assert.are.equal(0, supply_at(w.power.topology, w.grid, 5, 5))
+        for x = 1, 4 do World.build_road(w, x, 5) end -- edge road reaching the footprint
+        assert.are.equal(C.PLANT.CAPACITY, supply_at(w.power.topology, w.grid, 5, 5))
+    end)
+
+    it("seeds a powered snapshot at install, so a loaded city is lit without a tick", function()
+        local w = World.new(1)
+        World.build_road(w, 1, 4)
+        World.build_road(w, 2, 4)
+        World.build_road(w, 3, 4)
+        World.build_plant(w, 3, 5) -- road-connected, 100 MW
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL)
+        install_utilities(w)
+        assert.is_true(Power.building_powered(w, 1, 3)) -- no manual resolve needed
+    end)
+end)
+
+describe("Power.stats", function()
+    before_each(function() Bus.clear() end)
+
+    it("reports total supply and demand in MW", function()
+        local w = World.new(1)
+        Roads.install(w)
+        Power.install(w)
+        for x = 1, 3 do World.build_road(w, x, 4) end
+        World.build_plant(w, 3, 5)                     -- 100 MW
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL) -- 2
+        complete_building(w, 2, 3, C.ZONE.COMMERCIAL)  -- 3
+        local s = Power.stats(w)
+        assert.are.equal(C.PLANT.CAPACITY, s.supply)
+        assert.are.equal(5, s.demand)
+        assert.are.equal(0, s.dark)
+    end)
+
+    it("counts a loaded but unsupplied component as a dark area", function()
+        local w = World.new(1)
+        Roads.install(w)
+        Power.install(w)
+        World.build_road(w, 1, 4)                      -- no plant => 0 supply
+        complete_building(w, 1, 3, C.ZONE.RESIDENTIAL) -- 2 MW of unmet demand
+        local s = Power.stats(w)
+        assert.are.equal(0, s.supply)
+        assert.are.equal(2, s.demand)
+        assert.are.equal(1, s.dark)
+    end)
+end)
