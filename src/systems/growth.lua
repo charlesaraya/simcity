@@ -13,6 +13,7 @@ local World = require("src.world.world")
 local RNG = require("src.sim.rng")
 local Grid = require("src.world.grid")
 local Roads = require("src.systems.roads")
+local Power = require("src.systems.power")
 local C = require("src.world.constants")
 
 local Growth = {}
@@ -29,6 +30,10 @@ function Growth.system()
         interval = C.SIM.SECONDS_PER_MONTH,
         accumulator = 0,
         tick = function(world)
+            -- Resolve the power grid ONCE up front: every tile this tick reads the
+            -- same powered snapshot, so a building completing mid-pass can't black
+            -- out its neighbours within the same tick.
+            Power.resolve(world)
             Grid.each(world.grid, function(x, y, tile)
                 if tile.zone == C.ZONE.NONE then return end
                 local d = demand_for(world, tile.zone)
@@ -53,11 +58,14 @@ function Growth.system()
                         end
                     end
                 else
-                    -- Abandon a completed building on a true demand collapse, or on lost road.
+                    -- Abandon a completed building on any one of three triggers:
                     if d < C.GROWTH.ABANDON_THRESHOLD
                         and RNG.chance(world.rng, -d * C.GROWTH.ABANDON_RATE) then
                         World.abandon_building(world, x, y)
                     elseif not connected and RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
+                        World.abandon_building(world, x, y)
+                    elseif not Power.building_powered(world, x, y)
+                        and RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
                         World.abandon_building(world, x, y)
                     end
                 end

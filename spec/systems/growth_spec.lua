@@ -5,6 +5,7 @@
 local Growth = require("src.systems.growth")
 local World = require("src.world.world")
 local Roads = require("src.systems.roads")
+local Power = require("src.systems.power")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
 
@@ -17,13 +18,17 @@ local function zone_patch(w, n, zone)
     end
 end
 
--- Lay a connected road column down the left edge (x=1, rows 1..n) and install
--- the roads system. Call BEFORE zone_patch: the x=1 tiles become road (zoning
--- then skips them), leaving the x=2 column adjacent to a connected road so it
--- can grow under the connectivity gate.
+-- Lay a connected road column down the left edge (x=1, rows 1..n), install the
+-- roads and power systems, and drop a plant just past the column so the whole
+-- column is energised. Call BEFORE zone_patch: the x=1 tiles become road (zoning
+-- then skips them), leaving the x=2 column adjacent to a connected, POWERED road
+-- so it can grow and stay built under both the road and power gates. (Power is
+-- now a hard requirement -- an unpowered building abandons.)
 local function connect_left_edge(w, n)
     for y = 1, n do World.build_road(w, 1, y) end
     Roads.install(w)
+    Power.install(w)               -- after Roads.install: the plant gate reads roads.connected
+    World.build_plant(w, 1, n + 1) -- footprint touches the edge road (1,n) -> 100 MW into the column
 end
 
 describe("Growth", function()
@@ -129,6 +134,52 @@ describe("Growth", function()
             local g = Growth.system()
             for _ = 1, 200 do g.tick(w) end
             assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+    end)
+
+    describe("power connectivity gate", function()
+        it("abandons a completed building that has no power", function()
+            local w = World.new(1)
+            World.build_road(w, 2, 1) -- edge road: stays road-connected
+            Roads.install(w)
+            Power.install(w)
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 2, 2)
+            World.complete_building(w, 2, 2)
+            -- Zero demand: above the collapse threshold (so it is NOT a demand
+            -- abandon) yet too low to rebuild once it goes -- isolating the power
+            -- trigger. Road-connected, but with no plant the component is dark.
+            w.demand.residential = 0
+            local g = Growth.system()
+            for _ = 1, 200 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+
+        it("keeps a powered, road-connected building with positive demand", function()
+            local w = World.new(1)
+            for x = 1, 3 do World.build_road(w, x, 1) end -- edge chain
+            Roads.install(w)
+            Power.install(w)
+            World.build_plant(w, 3, 2) -- footprint touches road (3,1) -> 100 MW
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 2, 2)
+            World.complete_building(w, 2, 2)
+            w.demand.residential = 0.5
+            local g = Growth.system()
+            for _ = 1, 200 do g.tick(w) end
+            assert.are.equal(1, World.count_buildings(w, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE))
+        end)
+
+        it("does not gate construction on power (a site completes while unpowered)", function()
+            local w = World.new(1)
+            World.build_road(w, 2, 1)
+            Roads.install(w)
+            Power.install(w)
+            World.zone_tile(w, 2, 2, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 2, 2) -- constructing, no power anywhere
+            local g = Growth.system()
+            for _ = 1, C.GROWTH.CONSTRUCTION_TICKS do g.tick(w) end
+            assert.are.equal(1, World.count_buildings(w, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE))
         end)
     end)
 

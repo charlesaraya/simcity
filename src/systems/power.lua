@@ -44,7 +44,7 @@ end
 -- every component it borders (a building straddling two networks loads each once;
 -- construction sites draw nothing). Shared by resolve and stats so the two never
 -- disagree on what the load is.
-local function tally_demand(world, topo)
+local function tally_demand(world, component)
     local grid = world.grid
     local demand = {}
     Grid.each(grid, function(x, y, tile)
@@ -52,7 +52,7 @@ local function tally_demand(world, topo)
             local draw = C.POWER_DRAW[tile.zone] or 0
             local seen = {}
             for _, nb in ipairs(Grid.neighbors(grid, x, y)) do
-                local cid = topo.component[Grid.idx(grid, nb.x, nb.y)]
+                local cid = component[Grid.idx(grid, nb.x, nb.y)]
                 if cid and not seen[cid] then
                     seen[cid] = true
                     demand[cid] = (demand[cid] or 0) + draw
@@ -61,6 +61,13 @@ local function tally_demand(world, topo)
         end
     end)
     return demand
+end
+
+-- The cached topology, normalised so an as-yet-uncomputed cache reads as empty
+-- rather than crashing the pairs() walks below.
+local function topo_of(world)
+    local t = world.power.topology or {}
+    return t.component or {}, t.supply or {}
 end
 
 -- Flood-fill the conducting graph into components and sum each one's supply.
@@ -112,12 +119,12 @@ end
 -- Demand is the POTENTIAL load of completed buildings computed independently
 -- of the current powered state
 function Power.resolve(world)
-    local topo = world.power.topology or { component = {}, supply = {} }
-    local demand = tally_demand(world, topo)
+    local component, supply = topo_of(world)
+    local demand = tally_demand(world, component)
 
     local powered = {}
-    for idx, cid in pairs(topo.component) do
-        local sup = topo.supply[cid] or 0
+    for idx, cid in pairs(component) do
+        local sup = supply[cid] or 0
         if sup > 0 and (demand[cid] or 0) <= sup then
             powered[idx] = true
         end
@@ -129,8 +136,9 @@ end
 
 -- READ: is (x, y) served? True if any 4-neighbor is an energised conducting tile.
 function Power.building_powered(world, x, y)
+    local powered = world.power.powered or {}
     for _, nb in ipairs(Grid.neighbors(world.grid, x, y)) do
-        if world.power.powered[Grid.idx(world.grid, nb.x, nb.y)] then
+        if powered[Grid.idx(world.grid, nb.x, nb.y)] then
             return true
         end
     end
@@ -140,15 +148,15 @@ end
 -- READ: grid totals in MW plus the count of "dark areas" components whose demand
 -- outruns their supply (over-subscribed, or loaded with no source).
 function Power.stats(world)
-    local topo = world.power.topology or { component = {}, supply = {} }
-    local demand = tally_demand(world, topo)
+    local component, supply = topo_of(world)
+    local demand = tally_demand(world, component)
     local supply_total, demand_total, dark = 0, 0, 0
-    for _, sup in pairs(topo.supply) do
+    for _, sup in pairs(supply) do
         supply_total = supply_total + sup
     end
     for cid, dem in pairs(demand) do
         demand_total = demand_total + dem
-        if dem > (topo.supply[cid] or 0) then dark = dark + 1 end
+        if dem > (supply[cid] or 0) then dark = dark + 1 end
     end
     return { supply = supply_total, demand = demand_total, dark = dark }
 end
