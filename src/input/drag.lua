@@ -9,10 +9,25 @@ local C = require("src.world.constants")
 local Drag = {}
 
 -- A run tile is buildable iff it's plain grass: in-bounds, unzoned, no building,
--- not already a road. Existing roads are skipped.
+-- and free of any infrastructure.
 local function buildable(world, t)
     local tile = Grid.get(world.grid, t.x, t.y)
-    return tile and not tile.road and tile.zone == C.ZONE.NONE and not tile.building
+    return tile
+        and not tile.road
+        and not tile.power_line
+        and not tile.plant
+        and not tile.plant_part
+        and not tile.building
+        and tile.zone == C.ZONE.NONE
+end
+
+-- How many tiles in a run would actually be built.
+local function count_buildable(world, run)
+    local n = 0
+    for _, t in ipairs(run) do
+        if buildable(world, t) then n = n + 1 end
+    end
+    return n
 end
 
 -- Axis-only run from (x0,y0) to (x1,y1): a single straight line along whichever
@@ -40,35 +55,74 @@ function Drag.zone_rect(world, x0, y0, x1, y1)
     for x = lx, hx do
         for y = ly, hy do
             local tile = Grid.get(world.grid, x, y)
-            if tile and not tile.road then tiles[#tiles + 1] = { x = x, y = y } end
+            -- Zoning flows around all infrastructure.
+            if tile and not tile.road and not tile.power_line
+                and not tile.plant and not tile.plant_part then
+                tiles[#tiles + 1] = { x = x, y = y }
+            end
         end
     end
     return tiles
 end
 
--- A road run is valid unless it leaves the grid or crosses a zone/building.
--- Existing roads are fine (they'll be skipped at build time).
+-- A road/power-line run is valid unless it leaves the grid or crosses a solid
+-- obstacle. Existing roads and power lines are fine both conduct and are skipped
+-- at build time, so a run flows over them.
 function Drag.road_run_valid(world, run)
     for _, t in ipairs(run) do
         local tile = Grid.get(world.grid, t.x, t.y)
         if not tile then return false end -- off-grid
         if tile.zone ~= C.ZONE.NONE or tile.building then return false end
+        if tile.plant or tile.plant_part then return false end
     end
     return true
 end
 
--- Cost = ROAD.COST per grass tile that will actually be built. Existing roads in
--- the run are transparent and not charged.
+-- Cost is ROAD.COST per grass tile that will actually be built.
 function Drag.road_cost(world, run)
-    local n = 0
-    for _, t in ipairs(run) do
-        if buildable(world, t) then n = n + 1 end
-    end
-    return n * C.ROAD.COST
+    return count_buildable(world, run) * C.ROAD.COST
 end
 
 function Drag.road_affordable(world, run)
     return world.treasury >= Drag.road_cost(world, run)
+end
+
+-- Power lines reuse the road run's geometry and validity;
+-- only the per-tile price differs.
+function Drag.power_line_cost(world, run)
+    return count_buildable(world, run) * C.POWER_LINE.COST
+end
+
+function Drag.power_line_affordable(world, run)
+    return world.treasury >= Drag.power_line_cost(world, run)
+end
+
+-- A power plant's footprint.
+function Drag.plant_footprint(x, y)
+    local n = C.PLANT.FOOTPRINT
+    local tiles = {}
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            tiles[#tiles + 1] = { x = x + dx, y = y + dy }
+        end
+    end
+    return tiles
+end
+
+-- A plant placement is valid only if every footprint tile is on-grid plain grass.
+function Drag.plant_footprint_valid(world, x, y)
+    for _, t in ipairs(Drag.plant_footprint(x, y)) do
+        if not buildable(world, t) then return false end
+    end
+    return true
+end
+
+function Drag.plant_cost()
+    return C.PLANT.COST
+end
+
+function Drag.plant_affordable(world)
+    return world.treasury >= C.PLANT.COST
 end
 
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in
@@ -77,7 +131,10 @@ function Drag.zone_cost(world, tiles, zone)
     local n = 0
     for _, t in ipairs(tiles) do
         local tile = Grid.get(world.grid, t.x, t.y)
-        if tile and not tile.road and tile.zone ~= zone then n = n + 1 end
+        if tile and not tile.road and not tile.power_line
+            and not tile.plant and not tile.plant_part and tile.zone ~= zone then
+            n = n + 1
+        end
     end
     return n * C.ZONE_COST[zone]
 end

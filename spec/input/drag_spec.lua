@@ -67,6 +67,19 @@ describe("Drag.zone_rect", function()
         assert.are.equal(5, #Drag.zone_rect(w, 2, 2, 3, 4))
     end)
 
+    it("skips power-line tiles inside the box", function()
+        local w = World.new(1)
+        World.build_power_line(w, 3, 3) -- one line inside a 2x3 box
+        assert.are.equal(5, #Drag.zone_rect(w, 2, 2, 3, 4))
+    end)
+
+    it("skips power-plant tiles inside the box (zoning flows around the footprint)", function()
+        local w = World.new(1)
+        World.build_plant(w, 2, 2) -- 2x2 footprint fills (2,2),(3,2),(2,3),(3,3)
+        -- A 3x3 box (2,2)-(4,4) = 9 tiles minus the 4 plant tiles = 5.
+        assert.are.equal(5, #Drag.zone_rect(w, 2, 2, 4, 4))
+    end)
+
     it("drops out-of-bounds tiles", function()
         local w = World.new(1)
         -- box partly off the top-left corner: only in-bounds tiles returned.
@@ -110,6 +123,18 @@ describe("Drag road validity + cost", function()
             local w = World.new(1)
             assert.is_false(Drag.road_run_valid(w, Drag.road_run(1, 1, -3, 1)))
         end)
+
+        it("is invalid if the run crosses a power plant (a solid structure)", function()
+            local w = World.new(1)
+            World.build_plant(w, 3, 2) -- footprint covers (3,2) on the run
+            assert.is_false(Drag.road_run_valid(w, Drag.road_run(2, 2, 5, 2)))
+        end)
+
+        it("stays valid (transparent) when the run crosses a power line", function()
+            local w = World.new(1)
+            World.build_power_line(w, 3, 2) -- conductors coexist; the run skips it
+            assert.is_true(Drag.road_run_valid(w, Drag.road_run(2, 2, 5, 2)))
+        end)
     end)
 
     describe("road_cost", function()
@@ -121,6 +146,12 @@ describe("Drag road validity + cost", function()
         it("skips existing roads (transparent, not re-charged)", function()
             local w = World.new(1)
             World.build_road(w, 3, 2) -- one existing road in a 4-tile run
+            assert.are.equal(3 * C.ROAD.COST, Drag.road_cost(w, Drag.road_run(2, 2, 5, 2)))
+        end)
+
+        it("skips existing power lines too (not grass, not built over)", function()
+            local w = World.new(1)
+            World.build_power_line(w, 3, 2) -- one existing line in a 4-tile run
             assert.are.equal(3 * C.ROAD.COST, Drag.road_cost(w, Drag.road_run(2, 2, 5, 2)))
         end)
     end)
@@ -160,5 +191,78 @@ describe("Drag zone cost", function()
         assert.is_true(Drag.zone_affordable(w, tiles, RES))
         w.treasury = w.treasury - 1
         assert.is_false(Drag.zone_affordable(w, tiles, RES))
+    end)
+end)
+
+describe("Drag power-line cost", function()
+    -- A power line is a road clone: it reuses Drag.road_run for geometry and
+    -- Drag.road_run_valid for validity. Only the per-tile price differs, so it
+    -- gets its own cost/affordability pair keyed on C.POWER_LINE.COST.
+    it("charges POWER_LINE.COST per grass tile in the run", function()
+        local w = World.new(1)
+        assert.are.equal(4 * C.POWER_LINE.COST, Drag.power_line_cost(w, Drag.road_run(2, 2, 5, 2)))
+    end)
+
+    it("skips existing roads and power lines (transparent, not charged)", function()
+        local w = World.new(1)
+        World.build_road(w, 3, 2)       -- road in the run
+        World.build_power_line(w, 4, 2) -- line in the run
+        assert.are.equal(2 * C.POWER_LINE.COST, Drag.power_line_cost(w, Drag.road_run(2, 2, 5, 2)))
+    end)
+
+    it("power_line_affordable reflects the grass-tile cost", function()
+        local w = World.new(1)
+        local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
+        w.treasury = 4 * C.POWER_LINE.COST
+        assert.is_true(Drag.power_line_affordable(w, run))
+        w.treasury = w.treasury - 1
+        assert.is_false(Drag.power_line_affordable(w, run))
+    end)
+end)
+
+describe("Drag.plant_footprint", function()
+    -- "x,y" labels, sorted, for order-stable comparison (mirrors the road_run helper).
+    local function labels(tiles)
+        local out = {}
+        for _, t in ipairs(tiles) do out[#out + 1] = t.x .. "," .. t.y end
+        table.sort(out)
+        return out
+    end
+
+    it("returns the FOOTPRINT x FOOTPRINT square anchored at (x, y)", function()
+        assert.are.same({ "2,2", "2,3", "3,2", "3,3" }, labels(Drag.plant_footprint(2, 2)))
+    end)
+
+    describe("plant_footprint_valid", function()
+        it("is true on open grass", function()
+            local w = World.new(1)
+            assert.is_true(Drag.plant_footprint_valid(w, 2, 2))
+        end)
+
+        it("is false when the footprint runs off the grid", function()
+            local w = World.new(1)
+            assert.is_false(Drag.plant_footprint_valid(w, w.grid.width, 2))
+            assert.is_false(Drag.plant_footprint_valid(w, 2, w.grid.height))
+        end)
+
+        it("is false when any footprint tile is occupied", function()
+            local w = World.new(1)
+            World.build_road(w, 3, 3) -- one corner of the (2,2) footprint
+            assert.is_false(Drag.plant_footprint_valid(w, 2, 2))
+        end)
+    end)
+
+    describe("plant cost", function()
+        it("is the flat PLANT.COST", function()
+            assert.are.equal(C.PLANT.COST, Drag.plant_cost())
+        end)
+
+        it("plant_affordable reflects the treasury against PLANT.COST", function()
+            local w = World.new(1)
+            w.treasury = C.PLANT.COST
+            assert.is_true(Drag.plant_affordable(w))
+            w.treasury = w.treasury - 1
+            assert.is_false(Drag.plant_affordable(w))
+        end)
     end)
 end)
