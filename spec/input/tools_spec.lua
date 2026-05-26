@@ -86,6 +86,29 @@ describe("Tools", function()
             assert.is_false(Tools.apply_rect(C.TOOL.ZONE_RES, w, tiles))
             assert.are.equal(C.ZONE.NONE, tile_at(w, 2, 2).zone)
         end)
+
+        it("apply_line_run lays the whole power-line run when affordable", function()
+            local w = World.new(1)
+            local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
+            assert.is_true(Tools.apply_line_run(w, run))
+            for _, t in ipairs(run) do assert.is_true(tile_at(w, t.x, t.y).power_line) end
+        end)
+
+        it("apply_line_run lays nothing when unaffordable", function()
+            local w = World.new(1)
+            w.treasury = 3 * C.POWER_LINE.COST -- need 4
+            local run = Drag.road_run(2, 2, 5, 2)
+            assert.is_false(Tools.apply_line_run(w, run))
+            for _, t in ipairs(run) do assert.is_nil(tile_at(w, t.x, t.y).power_line) end
+        end)
+
+        it("apply_line_run lays nothing when the run crosses a zone", function()
+            local w = World.new(1)
+            World.zone_tile(w, 3, 2, C.ZONE.RESIDENTIAL)
+            local run = Drag.road_run(2, 2, 5, 2)
+            assert.is_false(Tools.apply_line_run(w, run))
+            assert.is_nil(tile_at(w, 2, 2).power_line)
+        end)
     end)
 
     describe("zoning affordability gate", function()
@@ -148,6 +171,82 @@ describe("Tools", function()
             local w = World.new(1)
             w.treasury = 500
             Tools.apply(C.TOOL.ROAD, w, 2, 2)
+            assert.are.equal(500, w.treasury)
+        end)
+    end)
+
+    describe("POWER_LINE tool", function()
+        local function line_spy()
+            local box = { called = 0 }
+            Bus.subscribe(C.EVENTS.POWER_LINE_BUILT, function() box.called = box.called + 1 end)
+            return box
+        end
+
+        it("lays a power line when the treasury can afford it", function()
+            local w = World.new(1)
+            w.treasury = C.POWER_LINE.COST
+            local spy = line_spy()
+            assert.is_true(Tools.apply(C.TOOL.POWER_LINE, w, 2, 2))
+            assert.is_true(tile_at(w, 2, 2).power_line)
+            assert.are.equal(1, spy.called)
+        end)
+
+        it("refuses and lays nothing when the treasury can't afford it", function()
+            local w = World.new(1)
+            w.treasury = C.POWER_LINE.COST - 1
+            local spy = line_spy()
+            assert.is_false(Tools.apply(C.TOOL.POWER_LINE, w, 2, 2))
+            assert.is_nil(tile_at(w, 2, 2).power_line)
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("does not itself mutate the treasury (the economy debits)", function()
+            local w = World.new(1)
+            w.treasury = 500
+            Tools.apply(C.TOOL.POWER_LINE, w, 2, 2)
+            assert.are.equal(500, w.treasury)
+        end)
+    end)
+
+    describe("PLANT tool", function()
+        local function plant_spy()
+            local box = { called = 0 }
+            Bus.subscribe(C.EVENTS.PLANT_BUILT, function() box.called = box.called + 1 end)
+            return box
+        end
+
+        it("places a 2x2 plant when affordable and the footprint is clear", function()
+            local w = World.new(1)
+            w.treasury = C.PLANT.COST
+            local spy = plant_spy()
+            assert.is_true(Tools.apply(C.TOOL.PLANT, w, 2, 2))
+            assert.is_truthy(tile_at(w, 2, 2).plant)
+            assert.are.equal(1, spy.called)
+        end)
+
+        it("refuses and builds nothing when unaffordable", function()
+            local w = World.new(1)
+            w.treasury = C.PLANT.COST - 1
+            local spy = plant_spy()
+            assert.is_false(Tools.apply(C.TOOL.PLANT, w, 2, 2))
+            assert.is_nil(tile_at(w, 2, 2).plant)
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses and builds nothing when the footprint is blocked", function()
+            local w = World.new(1)
+            w.treasury = C.PLANT.COST
+            World.build_road(w, 3, 3) -- a corner of the (2,2) footprint
+            local spy = plant_spy()
+            assert.is_false(Tools.apply(C.TOOL.PLANT, w, 2, 2))
+            assert.is_nil(tile_at(w, 2, 2).plant)
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("does not itself mutate the treasury (the economy debits)", function()
+            local w = World.new(1)
+            w.treasury = 500
+            Tools.apply(C.TOOL.PLANT, w, 2, 2)
             assert.are.equal(500, w.treasury)
         end)
     end)

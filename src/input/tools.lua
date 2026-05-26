@@ -40,6 +40,11 @@ function Tools.apply(tool, world, x, y)
         -- if the city can't afford it.
         if world.treasury < C.ROAD.COST then return false end
         return World.build_road(world, x, y)
+    elseif tool == C.TOOL.POWER_LINE then
+        if world.treasury < C.POWER_LINE.COST then return false end
+        return World.build_power_line(world, x, y)
+    elseif tool == C.TOOL.PLANT then
+        return Tools.apply_plant(world, x, y)
     end
     return false
 end
@@ -57,6 +62,19 @@ function Tools.apply_run(world, run)
     return true
 end
 
+-- Commit a dragged power-line run, all-or-nothing. Reuses the road run's validity
+-- (lines and roads share the same obstacles); only the price differs. Existing
+-- conductors in the run are passed over by build_power_line.
+function Tools.apply_line_run(world, run)
+    if not (Drag.road_run_valid(world, run) and Drag.power_line_affordable(world, run)) then
+        return false
+    end
+    for _, t in ipairs(run) do
+        World.build_power_line(world, t.x, t.y)
+    end
+    return true
+end
+
 -- Commit a dragged zone rectangle, all-or-nothing: only if the whole
 -- changed-tile cost is affordable. Tiles already in the zone (and roads, already
 -- excluded by zone_rect) are no-ops.
@@ -68,6 +86,15 @@ function Tools.apply_rect(tool, world, tiles)
         World.zone_tile(world, t.x, t.y, zone)
     end
     return true
+end
+
+-- Place a 2x2 power plant anchored at (x, y), all-or-nothing: only if the whole
+-- footprint is clear grass AND the flat plant cost is affordable.
+function Tools.apply_plant(world, x, y)
+    if not (Drag.plant_footprint_valid(world, x, y) and Drag.plant_affordable(world)) then
+        return false
+    end
+    return World.build_plant(world, x, y)
 end
 
 return Tools
