@@ -18,6 +18,7 @@ local Economy = require("src.systems.economy")
 local Zoning = require("src.systems.zoning")
 local Roads = require("src.systems.roads")
 local Power = require("src.systems.power")
+local Pollution = require("src.systems.pollution")
 local Tools = require("src.input.tools")
 local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
@@ -65,6 +66,7 @@ local function wire_world(w)
     Zoning.install(w)
     Roads.install(w)   -- recomputes the road-connectivity cache from the grid (on load too)
     Power.install(w)   -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
+    Pollution.install(w) -- subscribes source events (sets dirty); seeds the field from the grid
     Economy.install(w) -- subscribes the one-time road/line/plant debits
 end
 

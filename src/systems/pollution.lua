@@ -12,6 +12,7 @@
 -- property the road/power caches already rely on.
 
 local Grid = require("src.world.grid")
+local Bus = require("src.bus")
 local C = require("src.world.constants")
 
 local Pollution = {}
@@ -53,6 +54,43 @@ function Pollution.compute(grid)
     end)
 
     return field
+end
+
+-- READ: pollution at (x, y); an unpolluted tile reads 0.
+function Pollution.at(world, x, y)
+    return world.pollution.field[Grid.idx(world.grid, x, y)] or 0
+end
+
+-- Lazily rebuild the cached field from the grid, but only when it is dirty -- so a
+-- growth tick that completes many buildings (each marking dirty) pays for one
+-- recompute, not one per completion. Clears the flag.
+function Pollution.resolve(world)
+    if world.pollution.dirty then
+        world.pollution.field = Pollution.compute(world.grid)
+        world.pollution.dirty = false
+    end
+    return world.pollution.field
+end
+
+-- Event-driven dirtying: any change to the set of sources (a building finishing or
+-- abandoning, a plant going up or down) marks the field stale; the next resolve
+-- rebuilds it. Unlike the roads/power caches -- which recompute eagerly on each
+-- event -- pollution defers, because sources change in BULK during a growth tick.
+-- install seeds the field once (fresh game: empty; loaded game: rebuilt from the
+-- grid, never trusted from the save).
+function Pollution.install(world)
+    local function mark_dirty()
+        world.pollution.dirty = true
+    end
+    local events = {
+        C.EVENTS.BUILDING_CONSTRUCTED, C.EVENTS.BUILDING_ABANDONED,
+        C.EVENTS.PLANT_BUILT, C.EVENTS.PLANT_REMOVED,
+    }
+    for _, ev in ipairs(events) do
+        Bus.subscribe(ev, mark_dirty)
+    end
+    world.pollution.dirty = true
+    Pollution.resolve(world)
 end
 
 return Pollution
