@@ -28,6 +28,8 @@ describe("World", function()
         assert.are.equal(0, w.demand.commercial)
         assert.are.equal(0, w.demand.industrial)
         assert.are.same({}, w.roads.connected)
+        assert.are.same({}, w.pollution.field)
+        assert.is_false(w.pollution.dirty)
     end)
 
     describe("zone_tile", function()

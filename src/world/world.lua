@@ -40,6 +40,7 @@ function World.new(seed)
         economy = { last_net = 0 },              -- last month's net delta, for the HUD
         roads = { connected = {} },              -- Derived road-connectivity cache
         power = { topology = {}, powered = {} }, -- Derived power state, rebuilt from the grid on load
+        pollution = { field = {}, dirty = false }, -- Derived diffusion field; lazily rebuilt from the grid
     }
 end
 

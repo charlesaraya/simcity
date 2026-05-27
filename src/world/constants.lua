@@ -97,11 +97,17 @@ C.DEMAND       = {
 -- CONSTRUCTION_TICKS months to finish.
 -- ABANDON_THRESHOLD: Buildings abandon only when demand drops below this threshold,
 -- at a chance scaled by ABANDON_RATE.
+-- LV_MIN_FACTOR floors the land-value bias on res/com starts: even the dirtiest
+--   land grows, just slowly (factor ramps LV_MIN_FACTOR..1 with land value).
+-- POLLUTION_ABANDON_THRESHOLD: completed res/com over this pollution level roll to
+--   abandon (the 4th trigger); industry is immune.
 C.GROWTH       = {
-    RATE               = 0.15,
-    CONSTRUCTION_TICKS = 2,
-    ABANDON_THRESHOLD  = -0.5,
-    ABANDON_RATE       = 0.1,
+    RATE                        = 0.15,
+    CONSTRUCTION_TICKS          = 2,
+    ABANDON_THRESHOLD           = -0.5,
+    ABANDON_RATE                = 0.1,
+    LV_MIN_FACTOR               = 0.25,
+    POLLUTION_ABANDON_THRESHOLD = 40,
 }
 
 -- Economy tuning.
@@ -172,6 +178,32 @@ C.POWER_DRAW   = {
     [C.ZONE.RESIDENTIAL] = 2,
     [C.ZONE.COMMERCIAL]  = 3,
     [C.ZONE.INDUSTRIAL]  = 5,
+}
+
+-- Pollution diffusion (first-pass, tunable). Sources are completed industrial
+-- buildings and power plants. Each source paints tiles within RADIUS with
+-- strength * (1 - dist/RADIUS) [linear falloff]; overlapping sources add.
+C.POLLUTION    = {
+    IND_EMIT   = 10, -- strength at an industrial building's own tile
+    PLANT_EMIT = 8,  -- strength at a plant's anchor tile
+    RADIUS     = 6,  -- tiles; beyond this a source contributes nothing
+}
+
+-- Land value = clamp(BASE - K_POLLUTION * pollution, MIN, MAX). A pure read over
+-- the pollution field; no diffusion of its own (Phase 5 amenities add a + term).
+C.LAND         = {
+    BASE        = 100,
+    K_POLLUTION = 2.0,
+    MIN         = 0,
+    MAX         = 100,
+}
+
+-- Map overlay views (derived-state heatmaps). NONE = normal terrain render.
+C.OVERLAY      = {
+    NONE       = 0,
+    POLLUTION  = 1,
+    LAND_VALUE = 2,
+    POWER      = 3,
 }
 
 -- Event names published by world-state writers (Principle 4).
