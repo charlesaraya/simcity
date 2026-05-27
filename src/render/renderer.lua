@@ -15,7 +15,8 @@ local C = require("src.world.constants")
 
 local Renderer = {}
 
-local BUILD_SCALE = 0.55 -- building diamond size relative to the tile
+local BUILD_SCALE = 0.55  -- building diamond size relative to the tile
+local OVERLAY_ALPHA = 0.6 -- heatmap drawn translucent so zones/roads show through
 
 local function tile_color(tile, x, y)
     if tile.plant or tile.plant_part then return C.COLOR.PLANT end
@@ -47,12 +48,17 @@ function Renderer.draw(world, cam, hover, preview, overlay)
     if overlay ~= C.OVERLAY.NONE then lo, hi = Overlays.range(overlay, world) end
 
     Grid.each(world.grid, function(x, y, tile)
-        local fill = tile_color(tile, x, y)
-        if overlay ~= C.OVERLAY.NONE then
-            fill = Overlays.color(overlay, world, x, y, lo, hi) or fill
-        end
-        love.graphics.setColor(fill)
+        -- Base tile first, then the heatmap as a translucent layer on top, so the
+        -- underlying zone/road/terrain still reads through the overlay.
+        love.graphics.setColor(tile_color(tile, x, y))
         love.graphics.polygon("fill", Iso.tile_corners(x, y))
+        if overlay ~= C.OVERLAY.NONE then
+            local oc = Overlays.color(overlay, world, x, y, lo, hi)
+            if oc then
+                love.graphics.setColor(oc[1], oc[2], oc[3], OVERLAY_ALPHA)
+                love.graphics.polygon("fill", Iso.tile_corners(x, y))
+            end
+        end
         love.graphics.setColor(C.COLOR.TILE_LINE)
         love.graphics.polygon("line", Iso.tile_corners(x, y))
 
