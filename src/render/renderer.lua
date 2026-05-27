@@ -10,6 +10,7 @@ local Grid = require("src.world.grid")
 local Iso = require("src.render.iso")
 local Camera = require("src.render.camera")
 local Power = require("src.systems.power")
+local Overlays = require("src.render.overlays")
 local C = require("src.world.constants")
 
 local Renderer = {}
@@ -37,11 +38,20 @@ end
 
 -- `preview` (optional) = { tiles = {{x,y}...}, color = {r,g,b}, valid = bool };
 -- a translucent overlay of the tiles a drag would affect, red when invalid.
-function Renderer.draw(world, cam, hover, preview)
+-- `overlay` (optional, default NONE) selects a derived-state heatmap that replaces
+-- each tile's fill with its ramp color (buildings + grid lines still draw on top).
+function Renderer.draw(world, cam, hover, preview, overlay)
     Camera.apply(cam)
+    overlay = overlay or C.OVERLAY.NONE
+    local lo, hi = 0, 0
+    if overlay ~= C.OVERLAY.NONE then lo, hi = Overlays.range(overlay, world) end
 
     Grid.each(world.grid, function(x, y, tile)
-        love.graphics.setColor(tile_color(tile, x, y))
+        local fill = tile_color(tile, x, y)
+        if overlay ~= C.OVERLAY.NONE then
+            fill = Overlays.color(overlay, world, x, y, lo, hi) or fill
+        end
+        love.graphics.setColor(fill)
         love.graphics.polygon("fill", Iso.tile_corners(x, y))
         love.graphics.setColor(C.COLOR.TILE_LINE)
         love.graphics.polygon("line", Iso.tile_corners(x, y))

@@ -38,6 +38,13 @@ local TOOL_NAME = {
     [C.TOOL.PLANT]      = "Power Plant",
 }
 
+local OVERLAY_NAME = {
+    [C.OVERLAY.NONE]       = "None",
+    [C.OVERLAY.POLLUTION]  = "Pollution",
+    [C.OVERLAY.LAND_VALUE] = "Land Value",
+    [C.OVERLAY.POWER]      = "Power",
+}
+
 local function speed_name(speed)
     if speed == C.SPEED.PAUSED then return "Paused" end
     if speed == C.SPEED.FAST then return "Fast" end
@@ -51,7 +58,7 @@ function Hud.draw(world, opts)
     local com_n = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
     local ind_n = World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
 
-    love.graphics.print("Slow Grid - Phase 4a", 16, 16)
+    love.graphics.print("Slow Grid - Phase 4b", 16, 16)
     love.graphics.print(("Date %04d-%02d   Speed: %s   FPS %d")
         :format(year, month, speed_name(opts.speed), love.timer.getFPS()), 16, 38)
     love.graphics.print(("Pop %d    R %d    C %d    I %d")
@@ -72,6 +79,7 @@ function Hud.draw(world, opts)
     end
 
     love.graphics.print(("Tool: %s"):format(TOOL_NAME[opts.tool]), 16, 126)
+    love.graphics.print(("Overlay: %s"):format(OVERLAY_NAME[opts.overlay or C.OVERLAY.NONE]), 230, 126)
     if opts.drag_cost then
         love.graphics.print(("Cost  %s"):format(money(opts.drag_cost)), 16, 148)
     end
@@ -94,7 +102,7 @@ function Hud.draw(world, opts)
     budget_row("Month End Cash", money(world.treasury + b.net), top + 5 * ROW_H + 8)
 
     love.graphics.print(
-        "[1]Bulldoze [2]Res [3]Com [4]Ind [5]Road [6]Line [7]Plant  |  drag to build  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
+        "[1]Bulldoze [2]Res [3]Com [4]Ind [5]Road [6]Line [7]Plant  |  drag to build  |  [O]verlay  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
         16, love.graphics.getHeight() - 28)
 end
 

@@ -30,6 +30,15 @@ local Save = require("src.persistence.save")
 local world, cam, runner
 local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
+local current_overlay = C.OVERLAY.NONE
+
+-- Overlay cycle order for the [O] key: off -> pollution -> land value -> power -> off.
+local OVERLAY_CYCLE = {
+    [C.OVERLAY.NONE]       = C.OVERLAY.POLLUTION,
+    [C.OVERLAY.POLLUTION]  = C.OVERLAY.LAND_VALUE,
+    [C.OVERLAY.LAND_VALUE] = C.OVERLAY.POWER,
+    [C.OVERLAY.POWER]      = C.OVERLAY.NONE,
+}
 
 -- Tile coords where the current drag began (nil when not dragging). Roads and
 -- zones build on press/drag/release; bulldoze stays hold-to-paint.
@@ -143,9 +152,9 @@ function love.draw()
         preview = { tiles = Drag.plant_footprint(tx, ty), color = C.COLOR.PLANT, valid = valid }
         drag_cost = Drag.plant_cost()
     end
-    Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview)
+    Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
     local msg = (love.timer.getTime() < status_until) and status_msg or nil
-    Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost })
+    Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost, overlay = current_overlay })
 end
 
 function love.keypressed(key)
@@ -165,6 +174,8 @@ function love.keypressed(key)
         current_tool = C.TOOL.POWER_LINE
     elseif key == "7" then
         current_tool = C.TOOL.PLANT
+    elseif key == "o" then
+        current_overlay = OVERLAY_CYCLE[current_overlay]
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
     elseif key == "+" or key == "=" or key == "kp+" then
