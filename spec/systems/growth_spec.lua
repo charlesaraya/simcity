@@ -294,3 +294,51 @@ describe("Growth land-value bias", function()
         assert.is_false(w.pollution.dirty) -- growth called Pollution.resolve
     end)
 end)
+
+-- The 4th abandon trigger: heavy pollution drives completed residents and shops
+-- out. Industry is immune -- it tolerates its own filth. Isolated from the other
+-- triggers by keeping demand positive, roads intact, and power on, so pollution is
+-- the ONLY thing that can cause an abandonment here.
+describe("Growth pollution abandon", function()
+    before_each(function() Bus.clear() end)
+
+    local H = 30
+    -- Grow a connected, powered, in-demand column clean for 20 months, then poison
+    -- the whole column and run 20 more, counting building_abandoned events.
+    local function abandons_after_poison(seed, zone, pollution)
+        local w = World.new(seed)
+        for y = 1, H do World.build_road(w, 1, y) end
+        Roads.install(w)
+        Power.install(w)
+        World.build_plant(w, 1, H + 1)
+        for y = 1, H do World.zone_tile(w, 2, y, zone) end
+        if zone == C.ZONE.RESIDENTIAL then
+            w.demand.residential = 0.8
+        elseif zone == C.ZONE.COMMERCIAL then
+            w.demand.commercial = 0.8
+        else
+            w.demand.industrial = 0.8
+        end
+        local g = Growth.system()
+        for _ = 1, 20 do g.tick(w) end -- grow on clean land
+        for y = 1, H do w.pollution.field[Grid.idx(w.grid, 2, y)] = pollution end
+        local abandons = 0
+        Bus.subscribe(C.EVENTS.BUILDING_ABANDONED, function() abandons = abandons + 1 end)
+        for _ = 1, 20 do g.tick(w) end -- now poisoned
+        return abandons
+    end
+
+    it("abandons completed residential buildings under heavy pollution", function()
+        -- 50 > POLLUTION_ABANDON_THRESHOLD (40).
+        assert.is_true(abandons_after_poison(1, C.ZONE.RESIDENTIAL, 50) > 0)
+    end)
+
+    it("leaves industrial buildings standing under the same pollution", function()
+        assert.are.equal(0, abandons_after_poison(1, C.ZONE.INDUSTRIAL, 50))
+    end)
+
+    it("does not abandon residential below the pollution threshold", function()
+        -- 30 < POLLUTION_ABANDON_THRESHOLD (40): tolerable, no pollution abandon.
+        assert.are.equal(0, abandons_after_poison(1, C.ZONE.RESIDENTIAL, 30))
+    end)
+end)

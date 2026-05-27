@@ -87,7 +87,9 @@ function Growth.system()
                         end
                     end
                 else
-                    -- Abandon a completed building on any one of three triggers:
+                    -- Abandon a completed building on any one of four triggers:
+                    local poisoned = tile.zone ~= C.ZONE.INDUSTRIAL
+                        and Pollution.at(world, x, y) > C.GROWTH.POLLUTION_ABANDON_THRESHOLD
                     if d < C.GROWTH.ABANDON_THRESHOLD
                         and RNG.chance(world.rng, -d * C.GROWTH.ABANDON_RATE) then
                         World.abandon_building(world, x, y)
@@ -95,6 +97,9 @@ function Growth.system()
                         World.abandon_building(world, x, y)
                     elseif not Power.building_powered(world, x, y)
                         and RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
+                        World.abandon_building(world, x, y)
+                    elseif poisoned and RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
+                        -- Heavy pollution drives residents/shops out; industry tolerates it.
                         World.abandon_building(world, x, y)
                     end
                 end
