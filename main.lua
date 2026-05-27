@@ -40,6 +40,17 @@ local OVERLAY_CYCLE = {
     [C.OVERLAY.POWER]      = C.OVERLAY.NONE,
 }
 
+-- Number keys 1-7 select a tool.
+local TOOL_KEYS = {
+    ["1"] = C.TOOL.BULLDOZE,
+    ["2"] = C.TOOL.ZONE_RES,
+    ["3"] = C.TOOL.ZONE_COM,
+    ["4"] = C.TOOL.ZONE_IND,
+    ["5"] = C.TOOL.ROAD,
+    ["6"] = C.TOOL.POWER_LINE,
+    ["7"] = C.TOOL.PLANT,
+}
+
 -- Tile coords where the current drag began (nil when not dragging). Roads and
 -- zones build on press/drag/release; bulldoze stays hold-to-paint.
 local drag_start = nil
@@ -106,6 +117,7 @@ local function current_drag(cx, cy)
         return { tiles = run, color = C.COLOR.POWER_LINE, valid = valid }, Drag.power_line_cost(world, run)
     end
     local zone = ZONE_OF[current_tool]
+    if not zone then return nil end -- tool is not a zone (e.g. changed mid-drag): no preview
     local tiles = Drag.zone_rect(world, sx, sy, cx, cy)
     local valid = Drag.zone_affordable(world, tiles, zone)
     return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = valid }, Drag.zone_cost(world, tiles, zone)
@@ -160,21 +172,15 @@ end
 function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
-    elseif key == "1" then
-        current_tool = C.TOOL.BULLDOZE
-    elseif key == "2" then
-        current_tool = C.TOOL.ZONE_RES
-    elseif key == "3" then
-        current_tool = C.TOOL.ZONE_COM
-    elseif key == "4" then
-        current_tool = C.TOOL.ZONE_IND
-    elseif key == "5" then
-        current_tool = C.TOOL.ROAD
-    elseif key == "6" then
-        current_tool = C.TOOL.POWER_LINE
-    elseif key == "7" then
-        current_tool = C.TOOL.PLANT
-    elseif key == "o" then
+        return
+    end
+    local tool = TOOL_KEYS[key]
+    if tool then
+        current_tool = tool
+        drag_start = nil -- switching tools cancels any in-progress drag
+        return
+    end
+    if key == "o" then
         current_overlay = OVERLAY_CYCLE[current_overlay]
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
