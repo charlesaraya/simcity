@@ -17,6 +17,7 @@ local Growth = require("src.systems.growth")
 local Economy = require("src.systems.economy")
 local Zoning = require("src.systems.zoning")
 local Roads = require("src.systems.roads")
+local Power = require("src.systems.power")
 local Tools = require("src.input.tools")
 local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
@@ -45,7 +46,7 @@ local ZONE_PREVIEW_COLOR = {
 }
 
 local function is_drag_tool(tool)
-    return tool == C.TOOL.ROAD or ZONE_OF[tool] ~= nil
+    return tool == C.TOOL.ROAD or tool == C.TOOL.POWER_LINE or ZONE_OF[tool] ~= nil
 end
 
 -- Transient HUD status ("Saved"/"Loaded"), cleared after a short while.
@@ -62,8 +63,9 @@ end
 local function wire_world(w)
     Bus.clear()
     Zoning.install(w)
-    Roads.install(w)   -- recomputes the connectivity cache from the grid (on load too)
-    Economy.install(w) -- subscribes the one-time road-cost debit
+    Roads.install(w)   -- recomputes the road-connectivity cache from the grid (on load too)
+    Power.install(w)   -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
+    Economy.install(w) -- subscribes the one-time road/line/plant debits
 end
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
@@ -85,6 +87,12 @@ local function current_drag(cx, cy)
         local run = Drag.road_run(sx, sy, cx, cy)
         local valid = Drag.road_run_valid(world, run) and Drag.road_affordable(world, run)
         return { tiles = run, color = C.COLOR.PREVIEW_ROAD, valid = valid }, Drag.road_cost(world, run)
+    end
+    if current_tool == C.TOOL.POWER_LINE then
+        -- Power lines reuse the road run's geometry and validity; only price differs.
+        local run = Drag.road_run(sx, sy, cx, cy)
+        local valid = Drag.road_run_valid(world, run) and Drag.power_line_affordable(world, run)
+        return { tiles = run, color = C.COLOR.POWER_LINE, valid = valid }, Drag.power_line_cost(world, run)
     end
     local zone = ZONE_OF[current_tool]
     local tiles = Drag.zone_rect(world, sx, sy, cx, cy)
@@ -126,6 +134,12 @@ function love.draw()
     local preview, drag_cost
     if drag_start and tx then
         preview, drag_cost = current_drag(tx, ty)
+    elseif current_tool == C.TOOL.PLANT and tx then
+        -- Plant is a single click, not a drag: preview its 2x2 footprint under the
+        -- cursor, red when blocked or unaffordable.
+        local valid = Drag.plant_footprint_valid(world, tx, ty) and Drag.plant_affordable(world)
+        preview = { tiles = Drag.plant_footprint(tx, ty), color = C.COLOR.PLANT, valid = valid }
+        drag_cost = Drag.plant_cost()
     end
     Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview)
     local msg = (love.timer.getTime() < status_until) and status_msg or nil
@@ -145,6 +159,10 @@ function love.keypressed(key)
         current_tool = C.TOOL.ZONE_IND
     elseif key == "5" then
         current_tool = C.TOOL.ROAD
+    elseif key == "6" then
+        current_tool = C.TOOL.POWER_LINE
+    elseif key == "7" then
+        current_tool = C.TOOL.PLANT
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
     elseif key == "+" or key == "=" or key == "kp+" then
@@ -170,9 +188,15 @@ end
 -- Begin a road/zone drag: anchor on the tile under the cursor (in tile coords,
 -- so panning mid-drag doesn't move the anchor). Bulldoze isn't a drag tool.
 function love.mousepressed(_x, _y, button)
-    if button ~= 1 or not is_drag_tool(current_tool) then return end
+    if button ~= 1 then return end
     local tx, ty = hovered_tile()
-    if tx then drag_start = { x = tx, y = ty } end
+    if not tx then return end
+    -- Plant places on a single click (not a drag), all-or-nothing and self-gating.
+    if current_tool == C.TOOL.PLANT then
+        Tools.apply_plant(world, tx, ty)
+        return
+    end
+    if is_drag_tool(current_tool) then drag_start = { x = tx, y = ty } end
 end
 
 -- Commit the drag on release. apply_run/apply_rect are all-or-nothing and
@@ -183,6 +207,8 @@ function love.mousereleased(_x, _y, button)
     if cx then
         if current_tool == C.TOOL.ROAD then
             Tools.apply_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
+        elseif current_tool == C.TOOL.POWER_LINE then
+            Tools.apply_line_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         else
             Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
         end

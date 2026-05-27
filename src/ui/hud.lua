@@ -9,6 +9,7 @@
 local World = require("src.world.world")
 local Clock = require("src.systems.clock")
 local Economy = require("src.systems.economy")
+local Power = require("src.systems.power")
 local Format = require("src.ui.format")
 local C = require("src.world.constants")
 
@@ -28,11 +29,13 @@ local function budget_row(label, value, y)
 end
 
 local TOOL_NAME = {
-    [C.TOOL.BULLDOZE] = "Bulldoze",
-    [C.TOOL.ZONE_RES] = "Residential",
-    [C.TOOL.ZONE_COM] = "Commercial",
-    [C.TOOL.ZONE_IND] = "Industrial",
-    [C.TOOL.ROAD]     = "Road",
+    [C.TOOL.BULLDOZE]   = "Bulldoze",
+    [C.TOOL.ZONE_RES]   = "Residential",
+    [C.TOOL.ZONE_COM]   = "Commercial",
+    [C.TOOL.ZONE_IND]   = "Industrial",
+    [C.TOOL.ROAD]       = "Road",
+    [C.TOOL.POWER_LINE] = "Power Line",
+    [C.TOOL.PLANT]      = "Power Plant",
 }
 
 local function speed_name(speed)
@@ -48,16 +51,29 @@ function Hud.draw(world, opts)
     local com_n = World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
     local ind_n = World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
 
-    love.graphics.print("Slow Grid - Phase 3", 16, 16)
+    love.graphics.print("Slow Grid - Phase 4a", 16, 16)
     love.graphics.print(("Date %04d-%02d   Speed: %s   FPS %d")
         :format(year, month, speed_name(opts.speed), love.timer.getFPS()), 16, 38)
     love.graphics.print(("Pop %d    R %d    C %d    I %d")
         :format(World.population(world), res_n, com_n, ind_n), 16, 60)
     love.graphics.print(("Demand   R %+.2f    C %+.2f    I %+.2f")
         :format(world.demand.residential, world.demand.commercial, world.demand.industrial), 16, 82)
-    love.graphics.print(("Tool: %s"):format(TOOL_NAME[opts.tool]), 16, 104)
+
+    -- Power: total grid supply vs demand in MW, plus a blackout flag (a single
+    -- global surplus can still hide a starved component).
+    local p = Power.stats(world)
+    local power_txt = ("Power    Supply %d / Demand %d MW"):format(p.supply, p.demand)
+    love.graphics.print(power_txt, 16, 104)
+    if p.dark > 0 then
+        local font = love.graphics.getFont()
+        love.graphics.setColor(C.COLOR.UNPOWERED)
+        love.graphics.print(("  !  %d area(s) unpowered"):format(p.dark), 16 + font:getWidth(power_txt), 104)
+        love.graphics.setColor(1, 1, 1)
+    end
+
+    love.graphics.print(("Tool: %s"):format(TOOL_NAME[opts.tool]), 16, 126)
     if opts.drag_cost then
-        love.graphics.print(("Cost  %s"):format(money(opts.drag_cost)), 16, 126)
+        love.graphics.print(("Cost  %s"):format(money(opts.drag_cost)), 16, 148)
     end
 
     if opts.status then
@@ -78,7 +94,7 @@ function Hud.draw(world, opts)
     budget_row("Month End Cash", money(world.treasury + b.net), top + 5 * ROW_H + 8)
 
     love.graphics.print(
-        "[1]Bulldoze [2]Res [3]Com [4]Ind [5]Road  |  hold-click paint  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
+        "[1]Bulldoze [2]Res [3]Com [4]Ind [5]Road [6]Line [7]Plant  |  drag to build  |  space pause  +/- speed  |  F5 save  F9 load  |  WASD/scroll camera",
         16, love.graphics.getHeight() - 28)
 end
 

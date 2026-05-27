@@ -9,6 +9,7 @@
 local Grid = require("src.world.grid")
 local Iso = require("src.render.iso")
 local Camera = require("src.render.camera")
+local Power = require("src.systems.power")
 local C = require("src.world.constants")
 
 local Renderer = {}
@@ -16,6 +17,8 @@ local Renderer = {}
 local BUILD_SCALE = 0.55 -- building diamond size relative to the tile
 
 local function tile_color(tile, x, y)
+    if tile.plant or tile.plant_part then return C.COLOR.PLANT end
+    if tile.power_line then return C.COLOR.POWER_LINE end
     if tile.road then return C.COLOR.ROAD end
     if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.ZONE_RES end
     if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.ZONE_COM end
@@ -49,6 +52,14 @@ function Renderer.draw(world, cam, hover, preview)
             local hh = (C.TILE_H / 2) * BUILD_SCALE
             love.graphics.setColor(building_color(tile))
             love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
+            -- A completed but unpowered building wears an amber outline: it draws no
+            -- power (dark component or no connection) and will abandon over time.
+            if tile.building.state == C.BUILD.COMPLETE and not Power.building_powered(world, x, y) then
+                love.graphics.setColor(C.COLOR.UNPOWERED)
+                love.graphics.setLineWidth(2)
+                love.graphics.polygon("line", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
+                love.graphics.setLineWidth(1)
+            end
         end
     end)
 
