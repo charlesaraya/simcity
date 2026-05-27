@@ -14,6 +14,8 @@ local RNG = require("src.sim.rng")
 local Grid = require("src.world.grid")
 local Roads = require("src.systems.roads")
 local Power = require("src.systems.power")
+local Pollution = require("src.systems.pollution")
+local LandValue = require("src.systems.land_value")
 local C = require("src.world.constants")
 
 local Growth = {}
@@ -25,6 +27,18 @@ local function demand_for(world, zone)
     return 0
 end
 
+-- How much land value scales a tile's start chance. Residential and commercial
+-- prefer high-value (clean) land: the factor ramps from LV_MIN_FACTOR on the
+-- worst land up to 1.0 on the best, so dirty land still grows, just slowly.
+-- Industry is indifferent -- it takes the cheap, polluted land residents reject.
+local function land_value_factor(world, x, y, zone)
+    if zone == C.ZONE.INDUSTRIAL then return 1 end
+    local span = C.LAND.MAX - C.LAND.MIN
+    if span <= 0 then return 1 end
+    local norm = (LandValue.at(world, x, y) - C.LAND.MIN) / span
+    return C.GROWTH.LV_MIN_FACTOR + (1 - C.GROWTH.LV_MIN_FACTOR) * norm
+end
+
 function Growth.system()
     return {
         interval = C.SIM.SECONDS_PER_MONTH,
@@ -34,6 +48,9 @@ function Growth.system()
             -- same powered snapshot, so a building completing mid-pass can't black
             -- out its neighbours within the same tick.
             Power.resolve(world)
+            -- Rebuild the pollution field once too (only if dirtied since last tick),
+            -- so land-value reads below see a consistent snapshot for the whole pass.
+            Pollution.resolve(world)
             -- Spare capacity per component, decremented as we commit new sites this
             -- tick. Growth never starts a building its grid can't power, so the city
             -- plateaus at its supply ceiling instead of overshooting into a blackout.
@@ -49,8 +66,10 @@ function Growth.system()
                     local cid = Power.component_at(world, x, y)
                     local draw = C.POWER_DRAW[tile.zone] or 0
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
+                    -- Res/com favour clean, high-value land; industry is indifferent.
+                    local lv = land_value_factor(world, x, y, tile.zone)
                     if d > 0 and connected and has_power
-                        and RNG.chance(world.rng, d * C.GROWTH.RATE) then
+                        and RNG.chance(world.rng, d * C.GROWTH.RATE * lv) then
                         World.start_building(world, x, y)
                         headroom[cid] = headroom[cid] - draw
                     end

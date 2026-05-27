@@ -239,3 +239,58 @@ describe("Growth", function()
         assert.is_true(World.count_buildings(a, C.ZONE.RESIDENTIAL) > 0) -- something grew
     end)
 end)
+
+-- Land value (derived from pollution) biases WHERE res/com grow: a clean tile is
+-- far likelier to start than a polluted one; industry is indifferent. The demand
+-- math is untouched -- this only scales the per-tile start chance.
+describe("Growth land-value bias", function()
+    before_each(function() Bus.clear() end)
+
+    -- Grow a single tall column of zoned, road+power-connected tiles for 20 months
+    -- under a uniform injected pollution level; return how many buildings of `zone`
+    -- exist. A 30-tile column (not a saturating 8) keeps the sample big enough that
+    -- the start-chance bias shows instead of every tile filling regardless. The
+    -- pollution is set directly with dirty=false, so growth's resolve is a no-op
+    -- and the injected field stands (Pollution is intentionally not installed).
+    local H = 30
+    local function grown_under_pollution(seed, zone, demand, pollution)
+        local w = World.new(seed)
+        for y = 1, H do World.build_road(w, 1, y) end -- connected edge column
+        Roads.install(w)
+        Power.install(w)
+        World.build_plant(w, 1, H + 1) -- footprint touches the edge road -> powers the column
+        for y = 1, H do World.zone_tile(w, 2, y, zone) end -- the growable column, road-adjacent
+        if zone == C.ZONE.RESIDENTIAL then
+            w.demand.residential = demand
+        elseif zone == C.ZONE.COMMERCIAL then
+            w.demand.commercial = demand
+        else
+            w.demand.industrial = demand
+        end
+        for y = 1, H do
+            w.pollution.field[Grid.idx(w.grid, 2, y)] = pollution
+        end
+        local g = Growth.system()
+        for _ = 1, 20 do g.tick(w) end
+        return World.count_buildings(w, zone)
+    end
+
+    it("grows fewer residential on heavily polluted land than on clean land", function()
+        local clean = grown_under_pollution(1, C.ZONE.RESIDENTIAL, 0.8, 0)
+        local dirty = grown_under_pollution(1, C.ZONE.RESIDENTIAL, 0.8, 50) -- land value floored
+        assert.is_true(dirty < clean)
+    end)
+
+    it("leaves industrial growth unaffected by land value", function()
+        local clean = grown_under_pollution(1, C.ZONE.INDUSTRIAL, 0.8, 0)
+        local dirty = grown_under_pollution(1, C.ZONE.INDUSTRIAL, 0.8, 50)
+        assert.are.equal(clean, dirty)
+    end)
+
+    it("resolves the pollution field each tick", function()
+        local w = World.new(1)
+        w.pollution.dirty = true
+        Growth.system().tick(w)
+        assert.is_false(w.pollution.dirty) -- growth called Pollution.resolve
+    end)
+end)
