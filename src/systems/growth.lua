@@ -34,15 +34,25 @@ function Growth.system()
             -- same powered snapshot, so a building completing mid-pass can't black
             -- out its neighbours within the same tick.
             Power.resolve(world)
+            -- Spare capacity per component, decremented as we commit new sites this
+            -- tick. Growth never starts a building its grid can't power, so the city
+            -- plateaus at its supply ceiling instead of overshooting into a blackout.
+            local headroom = Power.headroom(world)
             Grid.each(world.grid, function(x, y, tile)
                 if tile.zone == C.ZONE.NONE then return end
                 local d = demand_for(world, tile.zone)
                 local connected = Roads.building_connected(world, x, y)
 
                 if not tile.building then
-                    -- Empty zoned tile: needs demand AND road access to start.
-                    if d > 0 and connected and RNG.chance(world.rng, d * C.GROWTH.RATE) then
+                    -- Empty zoned tile: needs demand, road access, AND a power
+                    -- component with room for its draw. Starting reserves that draw.
+                    local cid = Power.component_at(world, x, y)
+                    local draw = C.POWER_DRAW[tile.zone] or 0
+                    local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
+                    if d > 0 and connected and has_power
+                        and RNG.chance(world.rng, d * C.GROWTH.RATE) then
                         World.start_building(world, x, y)
+                        headroom[cid] = headroom[cid] - draw
                     end
                 elseif tile.building.state == C.BUILD.CONSTRUCTING then
                     if not connected then

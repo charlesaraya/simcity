@@ -253,6 +253,45 @@ describe("Power.building_powered", function()
     end)
 end)
 
+describe("Power.component_at", function()
+    before_each(function() Bus.clear() end)
+
+    it("returns the component of an adjacent conductor", function()
+        local w = World.new(1)
+        World.build_road(w, 5, 5)
+        w.power.topology = Power.compute_topology(w)
+        local cid = w.power.topology.component[Grid.idx(w.grid, 5, 5)]
+        assert.are.equal(cid, Power.component_at(w, 6, 5)) -- (6,5) borders the road
+    end)
+
+    it("is nil when nothing adjacent conducts", function()
+        local w = World.new(1)
+        w.power.topology = Power.compute_topology(w)
+        assert.is_nil(Power.component_at(w, 30, 30))
+    end)
+end)
+
+describe("Power.headroom", function()
+    before_each(function() Bus.clear() end)
+
+    it("is supply minus committed load, with constructing buildings reserving capacity", function()
+        local w = World.new(1)
+        for x = 1, 3 do World.build_road(w, x, 1) end -- edge chain
+        Roads.install(w)
+        Power.install(w)
+        World.build_plant(w, 3, 2) -- 150 MW into the component
+        local cid = w.power.topology.component[Grid.idx(w.grid, 1, 1)]
+        -- one completed residential (draws 2) + one constructing industrial (reserves 5)
+        World.zone_tile(w, 1, 2, C.ZONE.RESIDENTIAL)
+        World.start_building(w, 1, 2)
+        World.complete_building(w, 1, 2)
+        World.zone_tile(w, 2, 2, C.ZONE.INDUSTRIAL)
+        World.start_building(w, 2, 2) -- left constructing: still reserves its draw
+        local room = Power.headroom(w)
+        assert.are.equal(C.PLANT.CAPACITY - C.POWER_DRAW[C.ZONE.RESIDENTIAL] - C.POWER_DRAW[C.ZONE.INDUSTRIAL], room[cid])
+    end)
+end)
+
 describe("Power.install", function()
     before_each(function() Bus.clear() end)
 

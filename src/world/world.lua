@@ -199,10 +199,17 @@ function World.jobs(world)
     return com * C.JOBS_PER_COM + ind * C.JOBS_PER_IND
 end
 
--- READ: total completed buildings across every zone. The economy pays upkeep
--- per building regardless of kind, so it needs this gross count.
+-- READ: total completed buildings across every zone (a gross count for the HUD
+-- and stats; the economy bills upkeep on businesses only -- see business_count).
 function World.building_count(world)
     return World.count_buildings(world, nil, C.BUILD.COMPLETE)
+end
+
+-- READ: counts the buildings that carry city upkeep. Residential housing is
+-- upkeep-free, so population can grow without bleeding the budget.
+function World.business_count(world)
+    return World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
+        + World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
 end
 
 -- READ: number of power plants, counted by anchor tile.

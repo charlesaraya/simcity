@@ -105,15 +105,15 @@ C.GROWTH       = {
 }
 
 -- Economy tuning.
--- Tax comes from JOBS (commerce + industry: where economic activity happens),
--- and every completed building pays flat UPKEEP for services. Residents are not taxed
--- directly, so housing is a pure liability the jobs it shelters must cover.
--- A res-only town bleeds, balanced res/com holds steady (commerce funds the housing),
--- and industry pulls the economy up hardest.
+-- Tax comes from JOBS (commerce + industry: where economic activity happens), and
+-- UPKEEP falls only on those businesses (plus plant fuel). Residential housing is
+-- FREE -- no tax, no upkeep -- so population is pure upside and the budget tracks
+-- the commercial/industrial base. A res-only town is break-even; commerce and
+-- industry turn the profit that funds everything else.
 C.ECON         = {
     TAX_RATE       = 1, -- per job, per month
-    UPKEEP         = 2, -- per completed building, per month
-    START_TREASURY = 1000,
+    UPKEEP         = 2, -- per completed BUSINESS (commerce/industry), per month
+    START_TREASURY = 1500, -- runway to lay roads + a first plant before tax income ramps
 }
 
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
@@ -158,9 +158,9 @@ C.ZONE_COST    = {
 -- Power network tuning.
 C.PLANT        = {
     FOOTPRINT = 2,   -- side length, in tiles (2 => a 2x2 footprint)
-    CAPACITY  = 100, -- MW produced, only when road-connected
-    COST      = 300, -- one-time build cost
-    UPKEEP    = 10,  -- monthly fuel, per plant
+    CAPACITY  = 150, -- MW produced, only when road-connected (one plant covers a sizable district)
+    COST      = 150, -- one-time build cost (affordable as an early purchase)
+    UPKEEP    = 4,   -- monthly fuel, per plant (a real liability, not a budget-killer)
 }
 
 C.POWER_LINE   = {

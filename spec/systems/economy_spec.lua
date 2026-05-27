@@ -27,7 +27,7 @@ describe("Economy", function()
             assert.are.equal(expected, Economy.compute(50, 10))
         end)
 
-        it("makes a jobless building a pure cost (residential)", function()
+        it("makes an upkept building with no job tax a pure cost", function()
             assert.are.equal(-C.ECON.UPKEEP, Economy.compute(0, 1))
             assert.is_true(Economy.compute(0, 1) < 0)
         end)
@@ -63,7 +63,7 @@ describe("Economy", function()
             local w = World.new(1)
             build(w, 1, 1, C.ZONE.COMMERCIAL)
             build(w, 2, 1, C.ZONE.INDUSTRIAL)
-            local expected = Economy.compute(World.jobs(w), World.building_count(w))
+            local expected = Economy.compute(World.jobs(w), World.business_count(w))
 
             local before = w.treasury
             Economy.system().tick(w)
@@ -71,30 +71,29 @@ describe("Economy", function()
             assert.are.equal(expected, w.economy.last_net)
         end)
 
-        it("bleeds a residential-only city", function()
+        it("leaves a residential-only city budget-neutral (housing is free)", function()
             local w = World.new(1)
             build(w, 1, 1, C.ZONE.RESIDENTIAL)
             build(w, 2, 1, C.ZONE.RESIDENTIAL)
             local before = w.treasury
             Economy.system().tick(w)
-            assert.is_true(w.treasury < before)
+            assert.are.equal(before, w.treasury) -- residents earn nothing and cost nothing
         end)
 
-        it("holds a balanced residential/commercial city steady", function()
-            -- Two res + two com: commerce's job tax should exactly cover all four
-            -- buildings' upkeep. Derive the expectation from compute so this stays
-            -- honest if the constants are retuned -- the point is "balanced nets
-            -- whatever compute says", and under the first-pass tuning that's zero.
+        it("turns a profit on commerce, with residents free", function()
+            -- Two res (free) + two com: only the commercial buildings carry upkeep,
+            -- and their job tax outweighs it, so the city nets positive. Derive from
+            -- compute over the BUSINESS count so it tracks any later retune.
             local w = World.new(1)
             build(w, 1, 1, C.ZONE.RESIDENTIAL)
             build(w, 2, 1, C.ZONE.RESIDENTIAL)
             build(w, 3, 1, C.ZONE.COMMERCIAL)
             build(w, 4, 1, C.ZONE.COMMERCIAL)
-            local expected = Economy.compute(World.jobs(w), World.building_count(w))
+            local expected = Economy.compute(World.jobs(w), World.business_count(w))
             local before = w.treasury
             Economy.system().tick(w)
             assert.are.equal(before + expected, w.treasury)
-            assert.are.equal(0, expected) -- first-pass tuning: commerce funds the housing
+            assert.is_true(expected > 0) -- commerce funds itself and then some
         end)
 
         it("lifts the treasury once industry is added", function()
@@ -108,7 +107,7 @@ describe("Economy", function()
         it("burns monthly fuel for each plant", function()
             local w = World.new(1)
             World.build_plant(w, 5, 5) -- a plant, no buildings: pure fuel cost
-            local expected = Economy.compute(World.jobs(w), World.building_count(w), World.plant_count(w))
+            local expected = Economy.compute(World.jobs(w), World.business_count(w), World.plant_count(w))
             local before = w.treasury
             Economy.system().tick(w)
             assert.are.equal(before + expected, w.treasury)
@@ -135,15 +134,23 @@ describe("Economy", function()
             assert.are.same({ income = 0, expense = 0, net = 0 }, b)
         end)
 
-        it("income = job tax, expense = per-building upkeep, net = income - expense", function()
+        it("income = job tax, expense = business upkeep (residents free), net = income - expense", function()
             local w = World.new(1)
-            build(w, 1, 1, C.ZONE.COMMERCIAL)  -- jobs, 1 building
-            build(w, 2, 1, C.ZONE.RESIDENTIAL) -- no jobs, 1 building
+            build(w, 1, 1, C.ZONE.COMMERCIAL)  -- jobs + upkeep
+            build(w, 2, 1, C.ZONE.RESIDENTIAL) -- free: no jobs, no upkeep
             local b = Economy.budget(w)
             assert.are.equal(World.jobs(w) * C.ECON.TAX_RATE, b.income)
-            assert.are.equal(World.building_count(w) * C.ECON.UPKEEP, b.expense)
+            assert.are.equal(World.business_count(w) * C.ECON.UPKEEP, b.expense)
+            assert.are.equal(C.ECON.UPKEEP, b.expense) -- the commercial building only, not the res
             assert.are.equal(b.income - b.expense, b.net)
-            assert.are.equal(Economy.compute(World.jobs(w), World.building_count(w)), b.net)
+            assert.are.equal(Economy.compute(World.jobs(w), World.business_count(w)), b.net)
+        end)
+
+        it("charges no upkeep for residential buildings", function()
+            local w = World.new(1)
+            build(w, 1, 1, C.ZONE.RESIDENTIAL)
+            build(w, 2, 1, C.ZONE.RESIDENTIAL)
+            assert.are.equal(0, Economy.budget(w).expense)
         end)
 
         it("folds plant fuel into the monthly expense", function()
@@ -207,7 +214,7 @@ describe("Economy", function()
             local w = World.new(1)
             Economy.install(w)
             build(w, 1, 1, C.ZONE.INDUSTRIAL)
-            local expected = Economy.compute(World.jobs(w), World.building_count(w))
+            local expected = Economy.compute(World.jobs(w), World.business_count(w))
             local before = w.treasury
             Economy.system().tick(w)
             assert.are.equal(before + expected, w.treasury)

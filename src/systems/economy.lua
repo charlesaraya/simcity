@@ -1,14 +1,12 @@
 -- src/systems/economy.lua
--- The city budget, as a pure observer. Each month it taxes JOBS (commerce and
--- industry -- where economic activity happens; residents are not taxed) and
--- pays flat upkeep on every completed building, then moves world.treasury by the
--- net. It GATES NOTHING -- zoning and growth never ask whether there's money.
--- Treasury is a score and a feedback signal, not yet a constraint.
+-- The city budget, as a pure observer. Each month it taxes JOBS (where economic
+-- activity happens) and pays upkeep on buildings and infrastructure, then moves
+-- treasury by the net. It GATES NOTHING: zoning and growth never ask whether there's money.
+-- Treasury is a score and a feedback signal.
 --
--- This system is the test of Phase 1's decoupling bet: it subscribes to no
--- events and is referenced by nothing it observes. It reads world state by
--- scanning (like demand), and is registered in the runner additively. Adding it
--- required ZERO edits to demand, growth, zoning, or the world writers.
+-- This system subscribes to no events and is referenced by nothing it observes.
+-- It reads world state by scanning (like demand), and is registered in the runner
+-- additively. Adding it required ZERO edits to demand, growth, zoning, or the world writers.
 
 local World = require("src.world.world")
 local Bus = require("src.bus")
@@ -27,7 +25,7 @@ end
 -- Pure read: the recurring monthly budget for the HUD.
 function Economy.budget(world)
     local income = World.jobs(world) * C.ECON.TAX_RATE
-    local expense = World.building_count(world) * C.ECON.UPKEEP
+    local expense = World.business_count(world) * C.ECON.UPKEEP
         + World.plant_count(world) * C.PLANT.UPKEEP
     return { income = income, expense = expense, net = income - expense }
 end
@@ -38,15 +36,14 @@ function Economy.system()
         accumulator = 0,
         tick = function(world)
             local net = Economy.compute(
-                World.jobs(world), World.building_count(world), World.plant_count(world))
+                World.jobs(world), World.business_count(world), World.plant_count(world))
             world.treasury = world.treasury + net
             world.economy.last_net = net
         end,
     }
 end
 
--- The economy's event-driven face: one-time debits for infrastructure. The
--- economy is the only module that writes treasury.
+-- The economy's event-driven face. The economy is the only module that writes treasury.
 function Economy.install(world)
     Bus.subscribe(C.EVENTS.ROAD_BUILT, function()
         world.treasury = world.treasury - C.ROAD.COST

@@ -6,6 +6,7 @@ local Growth = require("src.systems.growth")
 local World = require("src.world.world")
 local Roads = require("src.systems.roads")
 local Power = require("src.systems.power")
+local Grid = require("src.world.grid")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
 
@@ -180,6 +181,35 @@ describe("Growth", function()
             local g = Growth.system()
             for _ = 1, C.GROWTH.CONSTRUCTION_TICKS do g.tick(w) end
             assert.are.equal(1, World.count_buildings(w, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE))
+        end)
+
+        it("does not START a building where the power component has no headroom", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 1) -- edge road, road-connected -- but no plant => 0 supply
+            Roads.install(w)
+            Power.install(w)
+            World.zone_tile(w, 2, 1, C.ZONE.RESIDENTIAL)
+            w.demand.residential = 1.0
+            local g = Growth.system()
+            for _ = 1, 50 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL)) -- power gates growth
+        end)
+
+        it("plateaus at the power ceiling instead of overshooting (no blackout loop)", function()
+            local w = World.new(1)
+            for y = 1, 6 do World.build_road(w, 1, y) end -- edge column
+            Roads.install(w)
+            Power.install(w)
+            -- Pin a tiny fixed supply: room for exactly two residential (draw 2 each).
+            local cid = w.power.topology.component[Grid.idx(w.grid, 1, 1)]
+            w.power.topology.supply[cid] = 2 * C.POWER_DRAW[C.ZONE.RESIDENTIAL]
+            for y = 1, 6 do World.zone_tile(w, 2, y, C.ZONE.RESIDENTIAL) end
+            w.demand.residential = 1.0
+            local g = Growth.system()
+            for _ = 1, 100 do g.tick(w) end
+            -- Committed load never exceeds supply, so growth settles at 2 and holds
+            -- (no overshoot -> no blackout -> no abandon -> no oscillation).
+            assert.are.equal(2, World.count_buildings(w, C.ZONE.RESIDENTIAL, C.BUILD.COMPLETE))
         end)
     end)
 

@@ -145,6 +145,44 @@ function Power.building_powered(world, x, y)
     return false
 end
 
+-- READ: the power component a building at (x, y) would draw from -- the lowest-id
+-- component among its conducting neighbours, or nil if none adjacent.
+function Power.component_at(world, x, y)
+    local component = topo_of(world)
+    local best
+    for _, nb in ipairs(Grid.neighbors(world.grid, x, y)) do
+        local cid = component[Grid.idx(world.grid, nb.x, nb.y)]
+        if cid and (not best or cid < best) then best = cid end
+    end
+    return best
+end
+
+-- READ: spare capacity (MW) per component = supply minus committed load, where
+-- EVERY building (constructing OR complete) reserves its zone's draw -- so an
+-- in-flight site can't be double-counted against the same capacity. Growth reads
+-- this to refuse starting a building the grid can't power, so the city plateaus at
+-- its supply ceiling instead of overshooting into the abandon/blackout loop.
+function Power.headroom(world)
+    local component, supply = topo_of(world)
+    local load = {}
+    Grid.each(world.grid, function(x, y, tile)
+        if tile.building then
+            local draw = C.POWER_DRAW[tile.zone] or 0
+            local seen = {}
+            for _, nb in ipairs(Grid.neighbors(world.grid, x, y)) do
+                local cid = component[Grid.idx(world.grid, nb.x, nb.y)]
+                if cid and not seen[cid] then
+                    seen[cid] = true
+                    load[cid] = (load[cid] or 0) + draw
+                end
+            end
+        end
+    end)
+    local room = {}
+    for cid, sup in pairs(supply) do room[cid] = sup - (load[cid] or 0) end
+    return room
+end
+
 -- READ: grid totals in MW plus the count of "dark areas" components whose demand
 -- outruns their supply (over-subscribed, or loaded with no source).
 function Power.stats(world)
@@ -164,11 +202,14 @@ end
 -- Event-driven: the topology cache (components + supply) is recomputed only when
 -- the conducting graph changes. Subscribes to road events as well as power events
 -- MUST be installed AFTER Roads.install so the plant-supply gate reads a fresh
--- road-connectivity cache. Resolving once at the end seeds a powered
--- snapshot, so a freshly loaded city is correctly lit before the first sim tick.
+-- road-connectivity cache. Each recompute also re-resolves the powered set, so an
+-- infra edit lights up at once (no waiting for a tick) and a freshly loaded city
+-- is correctly lit before the first sim tick. Growth still re-resolves per tick to
+-- fold in buildings that completed or abandoned during the month.
 function Power.install(world)
     local function recompute()
         world.power.topology = Power.compute_topology(world)
+        Power.resolve(world) -- re-light immediately, so infra edits show without waiting a tick
     end
     local events = {
         C.EVENTS.ROAD_BUILT, C.EVENTS.ROAD_REMOVED,
@@ -178,8 +219,7 @@ function Power.install(world)
     for _, ev in ipairs(events) do
         Bus.subscribe(ev, recompute)
     end
-    recompute()
-    Power.resolve(world)
+    recompute() -- seed topology + a powered snapshot (fresh game: empty; load: from grid)
 end
 
 return Power
