@@ -206,6 +206,13 @@ C.OVERLAY      = {
     POWER      = 3,
 }
 
+-- Heatmap color stops (green -> yellow -> red). Pollution reads high = bad (red);
+-- land value is the inverse (high = good = green), so its stops are reversed.
+C.RAMP         = {
+    POLLUTION  = { { 0.25, 0.65, 0.30 }, { 0.90, 0.80, 0.25 }, { 0.80, 0.25, 0.20 } },
+    LAND_VALUE = { { 0.80, 0.25, 0.20 }, { 0.90, 0.80, 0.25 }, { 0.25, 0.65, 0.30 } },
+}
+
 -- Event names published by world-state writers (Principle 4).
 C.EVENTS       = {
     TILE_ZONED           = "tile_zoned",
