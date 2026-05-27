@@ -5,6 +5,7 @@
 -- nothing.
 
 local Grid = require("src.world.grid")
+local Network = require("src.systems.network")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
 
@@ -14,35 +15,31 @@ local function is_edge(grid, x, y)
     return x == 1 or x == grid.width or y == 1 or y == grid.height
 end
 
--- Flood-fill from every edge road tile over road neighbors.
-function Roads.compute(grid)
-    local connected = {}
-    local stack = {}
+local function is_road(tile)
+    return tile.road == true
+end
 
-    -- Seed the frontier with road tiles sitting on a map edge.
-    Grid.each(grid, function(x, y, tile)
-        if tile.road and is_edge(grid, x, y) then
-            local idx = Grid.idx(grid, x, y)
-            if not connected[idx] then
-                connected[idx] = true
-                stack[#stack + 1] = { x, y }
-            end
+-- A road is on the network iff its connected component touches a map edge -- the
+-- edge is the city's link to the outside world, so an interior-only run connects
+-- to nothing. Label every road component (NetworkedUtility), mark the ones with an
+-- edge tile, then keep the tiles of those components. Returns a flat set {idx=true}.
+function Roads.compute(grid)
+    local component = Network.components(grid, is_road)
+
+    local edge_reaching = {}
+    Grid.each(grid, function(x, y, _)
+        local cid = component[Grid.idx(grid, x, y)]
+        if cid and is_edge(grid, x, y) then
+            edge_reaching[cid] = true
         end
     end)
 
-    -- Walk inward: any road neighbor of a connected tile is itself connected.
-    while #stack > 0 do
-        local cell = table.remove(stack)
-        for _, n in ipairs(Grid.neighbors(grid, cell[1], cell[2])) do
-            local tile = Grid.get(grid, n.x, n.y)
-            local idx = Grid.idx(grid, n.x, n.y)
-            if tile.road and not connected[idx] then
-                connected[idx] = true
-                stack[#stack + 1] = { n.x, n.y }
-            end
+    local connected = {}
+    for idx, cid in pairs(component) do
+        if edge_reaching[cid] then
+            connected[idx] = true
         end
     end
-
     return connected
 end
 
@@ -59,14 +56,9 @@ function Roads.install(world)
 end
 
 -- READ: is (x, y) served by the network? True if any 4-neighbor is a road tile
--- that reaches a map edge.
+-- that reaches a map edge (the shared NetworkedUtility query over the cached set).
 function Roads.building_connected(world, x, y)
-    for _, n in ipairs(Grid.neighbors(world.grid, x, y)) do
-        if world.roads.connected[Grid.idx(world.grid, n.x, n.y)] then
-            return true
-        end
-    end
-    return false
+    return Network.adjacent(world.grid, world.roads.connected, x, y)
 end
 
 return Roads
