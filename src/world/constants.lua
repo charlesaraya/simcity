@@ -193,9 +193,9 @@ C.POLLUTION    = {
 -- the pollution field; no diffusion of its own (Phase 5 amenities add a + term).
 C.LAND         = {
     BASE        = 100,
-    K_POLLUTION = 2.0,
-    MIN         = 0,
-    MAX         = 100,
+    K_POLLUTION = 1.0, -- softened from 2.0: land value degrades gradually, so the
+    MIN         = 0,   --   heatmap shows a real green->yellow->red gradient instead
+    MAX         = 100, --   of snapping to red around any industry
 }
 
 -- Map overlay views (derived-state heatmaps). NONE = normal terrain render.

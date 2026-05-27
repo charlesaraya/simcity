@@ -277,7 +277,9 @@ describe("Growth land-value bias", function()
 
     it("grows fewer residential on heavily polluted land than on clean land", function()
         local clean = grown_under_pollution(1, C.ZONE.RESIDENTIAL, 0.8, 0)
-        local dirty = grown_under_pollution(1, C.ZONE.RESIDENTIAL, 0.8, 50) -- land value floored
+        -- Pollution well past BASE/K_POLLUTION floors land value to MIN regardless of
+        -- the exact K, so this asserts the worst-land case independent of tuning.
+        local dirty = grown_under_pollution(1, C.ZONE.RESIDENTIAL, 0.8, 1000)
         assert.is_true(dirty < clean)
     end)
 
