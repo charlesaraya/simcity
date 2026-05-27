@@ -17,9 +17,7 @@ local C = require("src.world.constants")
 
 local Pollution = {}
 
--- A tile's emission strength as a source, or 0 if it isn't one. Only a power plant
--- (its anchor carries tile.plant) and a COMPLETED industrial building emit;
--- residential/commercial and still-constructing tiles are clean.
+-- A tile's emission strength as a source, or 0 if it isn't one.
 local function emit(tile)
     if tile.plant then
         return C.POLLUTION.PLANT_EMIT
@@ -32,7 +30,6 @@ local function emit(tile)
 end
 
 -- Flood each source's contribution onto every tile within RADIUS, summing.
--- Returns {idx -> value}; an absent index reads as zero pollution.
 function Pollution.compute(grid)
     local field = {}
     local r = C.POLLUTION.RADIUS
@@ -56,14 +53,12 @@ function Pollution.compute(grid)
     return field
 end
 
--- READ: pollution at (x, y); an unpolluted tile reads 0.
+-- READ: pollution at (x, y). An unpolluted tile reads 0.
 function Pollution.at(world, x, y)
     return world.pollution.field[Grid.idx(world.grid, x, y)] or 0
 end
 
--- Lazily rebuild the cached field from the grid, but only when it is dirty -- so a
--- growth tick that completes many buildings (each marking dirty) pays for one
--- recompute, not one per completion. Clears the flag.
+-- Lazily rebuild the cached field from the grid, but only when it is dirty.
 function Pollution.resolve(world)
     if world.pollution.dirty then
         world.pollution.field = Pollution.compute(world.grid)
@@ -74,10 +69,7 @@ end
 
 -- Event-driven dirtying: any change to the set of sources (a building finishing or
 -- abandoning, a plant going up or down) marks the field stale; the next resolve
--- rebuilds it. Unlike the roads/power caches -- which recompute eagerly on each
--- event -- pollution defers, because sources change in BULK during a growth tick.
--- install seeds the field once (fresh game: empty; loaded game: rebuilt from the
--- grid, never trusted from the save).
+-- rebuilds it.
 function Pollution.install(world)
     local function mark_dirty()
         world.pollution.dirty = true

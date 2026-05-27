@@ -1,13 +1,5 @@
 -- src/systems/land_value.lua
--- Land value is a pure facade over the pollution field, NOT a field of its own:
--- land_value = clamp(BASE - K_POLLUTION * pollution, MIN, MAX). Because pollution
--- is already diffused, land value needs no diffusion, no cache, no install, and no
--- event subscription -- it is an O(1) read. This is the cleanest expression of
--- "land value is derived from pollution".
---
--- Phase 5 forward-compat: when amenity fields (parks, police) arrive, this becomes
--- BASE + amenities - K*pollution, and THAT second diffused field is the moment to
--- extract a shared DiffusionField. Not before -- 4b has only one diffusion instance.
+-- Land value is derived from pollution = clamp(BASE - K_POLLUTION * pollution, MIN, MAX).
 
 local Grid = require("src.world.grid")
 local Pollution = require("src.systems.pollution")
