@@ -33,6 +33,8 @@ local Theme = require("src.ui.theme")
 local ScreenManager = require("src.ui.screen_manager")
 local Home = require("src.ui.screens.home")
 local PauseModal = require("src.ui.screens.pause_modal")
+local NewMission = require("src.ui.screens.new_mission")
+local RNG = require("src.sim.rng")
 
 local world, cam, runner
 local mgr
@@ -165,6 +167,22 @@ local function load_into_mission()
     return true
 end
 
+-- NewMission action closures. Back returns to Home; Charter commits the form:
+-- start a fresh mission world, then call World.charter to populate crew +
+-- mission on it. started_at is stamped here (wall-clock at acceptance), kept
+-- off the screen so the screen stays pure.
+local function new_mission_actions()
+    return {
+        back = function() mgr:set_current("home") end,
+        charter = function(payload)
+            local mission = payload.mission
+            mission.started_at = os.time()
+            start_mission(os.time()) -- builds world/runner/wires; flips in_game on
+            World.charter(world, mission, payload.crew)
+        end,
+    }
+end
+
 -- Home action closures. Step 3 stubs for archive/settings (later steps wire
 -- real screens); continue/new_mission/end_transmission do their real work.
 local function home_actions()
@@ -174,7 +192,15 @@ local function home_actions()
             mgr.in_game = true
             mgr:clear_current()
         end,
-        new_mission      = function() start_mission(os.time()) end,
+        -- Fresh charter screen on each entry: a new RNG seed gives a different
+        -- suggested mission + crew each time, so Back/re-enter feels alive.
+        new_mission = function()
+            mgr:register("new_mission", NewMission.new({
+                rng = RNG.new(os.time()),
+                actions = new_mission_actions(),
+            }))
+            mgr:set_current("new_mission")
+        end,
         archive          = function() end, -- step 7
         settings         = function() end, -- step 8
         end_transmission = function() love.event.quit() end,

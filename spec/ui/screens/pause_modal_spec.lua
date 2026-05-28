@@ -78,6 +78,35 @@ describe("PauseModal keyboard nav", function()
     end)
 end)
 
+describe("PauseModal direct hotkeys", function()
+    local HOTKEYS = {
+        { hotkey = "r", key = "resume",            index = 1 },
+        { hotkey = "s", key = "save_to_archive",   index = 2 },
+        { hotkey = "l", key = "load_from_archive", index = 3 },
+        { hotkey = "m", key = "mission_control",   index = 4 },
+        { hotkey = "q", key = "end_transmission",  index = 5 },
+    }
+
+    for _, spec in ipairs(HOTKEYS) do
+        it(("%q fires %s from any focus"):format(spec.hotkey, spec.key), function()
+            local actions, calls = actions_stub()
+            local m = PauseModal.new(actions)
+            m.selected = 1
+            m:keypressed(spec.hotkey)
+            assert.are.same({ spec.key }, calls)
+            assert.are.equal(spec.index, m.selected)
+        end)
+    end
+
+    it("every option exposes a single-letter hotkey", function()
+        local m = PauseModal.new(actions_stub())
+        for _, opt in ipairs(m.options) do
+            assert.is_string(opt.hotkey)
+            assert.are.equal(1, #opt.hotkey)
+        end
+    end)
+end)
+
 describe("PauseModal mouse", function()
     it("mousemoved over a row sets selected", function()
         local m = PauseModal.new(actions_stub())

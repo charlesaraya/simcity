@@ -2,34 +2,44 @@
 -- The top-level menu surface. Five options in the documented order:
 -- Continue Operations / New Mission / Load from Archive / Operator Settings /
 -- End Transmission. Actions are INJECTED at construction so the screen has no
--- coupling to the manager; main.lua passes in closures that start a mission,
--- load a save, quit, etc. Everything except draw is pure and headless-testable.
+-- coupling to the manager; main.lua passes in closures.
 --
 -- Selection nav:
---   ↑/↓   move selection (clamped — no wrap; see review-before-commit notes)
+--   ↑/↓   move selection (clamped — no wrap)
 --   Enter / kpenter  fire the action for the selected option
 --   Esc   fire end_transmission (from the root menu, back-out IS quit)
+--
+-- Direct hotkeys (any focus): C continue · N new mission · L load archive ·
+--   S settings · Q quit. Each unselected row displays its letter on the right;
+--   the focused row shows ↵ instead.
 --
 -- Mouse:
 --   hover  sets selected to the row under the cursor
 --   click  selects the row AND fires its action (left button only)
 
-local Home    = {}
-Home.__index  = Home
+local Home   = {}
+Home.__index = Home
 
--- Layout constants. Kept module-local so the pure hit-test (row_at) and the
--- love-side draw (step 3 draw is a stub — wired in the run-verify pass) share
--- one source of truth.
-local START_Y = 240
-local ROW_H   = 44
+-- Layout: the menu sits inside an outlined panel sized to its content (height
+-- == N rows + padding) and roughly half the window wide, centered horizontally
+-- in the draw. The y-anchored constants stay module-level so the pure
+-- row_at / row_center hit-test stays headless-testable (no love calls).
+local PANEL_TOP_Y = 140
+local PANEL_PAD   = 24
+local ROW_H       = 60
+local ROWS_TOP_Y  = PANEL_TOP_Y + PANEL_PAD
 
 local OPTIONS = {
-    { key = "continue",         label = "Continue Operations" },
-    { key = "new_mission",      label = "New Mission" },
-    { key = "archive",          label = "Load from Archive" },
-    { key = "settings",         label = "Operator Settings" },
-    { key = "end_transmission", label = "End Transmission" },
+    { key = "continue",         label = "CONTINUE OPERATIONS", hotkey = "c" },
+    { key = "new_mission",      label = "NEW MISSION",         hotkey = "n" },
+    { key = "archive",          label = "LOAD FROM ARCHIVE",   hotkey = "l" },
+    { key = "settings",         label = "OPERATOR SETTINGS",   hotkey = "s" },
+    { key = "end_transmission", label = "END TRANSMISSION",    hotkey = "q" },
 }
+
+-- Hotkey -> option index, derived once from OPTIONS so keypressed is O(1).
+local HOTKEY_TO_INDEX = {}
+for i, opt in ipairs(OPTIONS) do HOTKEY_TO_INDEX[opt.hotkey] = i end
 
 function Home.new(actions)
     local self = setmetatable({}, Home)
@@ -61,23 +71,31 @@ function Home:keypressed(key)
         fire(self, self.options[self.selected].key)
     elseif key == "escape" then
         fire(self, "end_transmission")
+    else
+        -- Direct hotkey: select that row AND fire its action. Selecting first
+        -- keeps the visual in sync so a returning user (or a future "are you
+        -- sure?" prompt) sees what was picked.
+        local i = HOTKEY_TO_INDEX[key]
+        if i then
+            self.selected = i
+            fire(self, self.options[i].key)
+        end
     end
 end
 
 -- GEOMETRY (pure, shared by hit-test and draw) ------------------------------
 
--- Center coordinate of row i. X is nominal (0) — the row spans the menu's
--- full horizontal extent for hit-testing purposes in step 3; draw centers on
--- the window width at love-time.
+-- Center coordinate of row i. X is nominal (0) — the row spans the panel's
+-- full inner width; draw centers content on the actual window.
 function Home:row_center(i)
-    return 0, START_Y + (i - 1) * ROW_H + ROW_H * 0.5
+    return 0, ROWS_TOP_Y + (i - 1) * ROW_H + ROW_H * 0.5
 end
 
 -- Hit-test: which row index covers screen-y, or nil if y is above the first
--- row or below the last. X is ignored (rows span the menu horizontally).
+-- row or below the last. X is ignored (rows span the panel horizontally).
 function Home:row_at(_x, y)
-    if y < START_Y then return nil end
-    local i = math.floor((y - START_Y) / ROW_H) + 1
+    if y < ROWS_TOP_Y then return nil end
+    local i = math.floor((y - ROWS_TOP_Y) / ROW_H) + 1
     if i < 1 or i > #self.options then return nil end
     return i
 end
@@ -90,56 +108,56 @@ function Home:mousemoved(x, y)
 end
 
 function Home:mousepressed(x, y, button)
-    if button ~= 1 then return end -- left only
+    if button ~= 1 then return end
     local i = self:row_at(x, y)
     if not i then return end
     self.selected = i
     fire(self, self.options[i].key)
 end
 
--- DRAW --------------------------------------------
--- Minimal first pass: display title, dim subtitle,
--- then the five options. Selected row is rendered in the ink-red accent with
--- a leading marker. Centered on the current window width.
+-- DRAW (love-only; run-verified) --------------------------------------------
+-- Outlined panel sized to content: half the window wide, centered, height
+-- equal to N rows + padding. Each row is a full-width-inside-the-panel
+-- rectangle. The selected row is amber-filled with horizontal scanlines and
+-- reverses to bg-colored text + leading ▶ marker. Unselected rows are
+-- outlined with bone label only — hotkeys still work silently (C/N/L/S/Q).
 
-local Theme      = require("src.ui.theme")
+local Theme   = require("src.ui.theme")
+local Widgets = require("src.ui.widgets")
 
-local TITLE      = "SLOW GRID"
-local SUBTITLE   = "GROUND CONTROL · MISSION SHELL"
-local TITLE_Y    = 120
-local SUBTITLE_Y = 180
+local MARKER = "▶"
 
 function Home:draw()
-    local w = love.graphics.getWidth()
+    local W = love.graphics.getWidth()
 
-    -- Title (slab serif display)
-    love.graphics.setFont(Theme.font("display"))
-    love.graphics.setColor(Theme.color("fg"))
-    local tw = love.graphics.getFont():getWidth(TITLE)
-    love.graphics.print(TITLE, (w - tw) * 0.5, TITLE_Y)
+    -- Panel sized to content + roughly half the window wide.
+    local pw = W * 0.5
+    local px = (W - pw) * 0.5
+    local py = PANEL_TOP_Y
+    local ph = #self.options * ROW_H + PANEL_PAD * 2
+    Widgets.frame(px, py, pw, ph)
 
-    -- Subtitle (mono meta, dim)
-    love.graphics.setFont(Theme.font("meta"))
-    love.graphics.setColor(Theme.color("dim_fg"))
-    local sw = love.graphics.getFont():getWidth(SUBTITLE)
-    love.graphics.print(SUBTITLE, (w - sw) * 0.5, SUBTITLE_Y)
+    -- Row geometry inside the panel.
+    local row_x = px + PANEL_PAD
+    local row_w = pw - PANEL_PAD * 2
+    local row_inner_h = ROW_H - 8 -- visual gap between rows
 
-    -- Options (slab serif heading). The selected row gets the accent and a
-    -- leading marker; siblings render in bone fg.
     love.graphics.setFont(Theme.font("heading"))
     local font = love.graphics.getFont()
+
     for i, opt in ipairs(self.options) do
-        local _, cy = self:row_center(i)
-        local y = cy - font:getHeight() * 0.5
+        local ry = ROWS_TOP_Y + (i - 1) * ROW_H + 4 -- top edge of drawn rect
+        local text_y = ry + (row_inner_h - font:getHeight()) * 0.5
+
         if i == self.selected then
-            love.graphics.setColor(Theme.color("accent"))
-            local label = "› " .. opt.label
-            local lw = font:getWidth(label)
-            love.graphics.print(label, (w - lw) * 0.5, y)
+            Widgets.scanline_fill(row_x, ry, row_w, row_inner_h)
+            love.graphics.setColor(Theme.color("bg"))
+            love.graphics.print(MARKER, row_x + 20, text_y)
+            love.graphics.print(opt.label, row_x + 64, text_y)
         else
+            Widgets.outline(row_x, ry, row_w, row_inner_h)
             love.graphics.setColor(Theme.color("fg"))
-            local lw = font:getWidth(opt.label)
-            love.graphics.print(opt.label, (w - lw) * 0.5, y)
+            love.graphics.print(opt.label, row_x + 64, text_y)
         end
     end
 end

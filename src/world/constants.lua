@@ -22,9 +22,10 @@ C.TILE         = {
 C.UI           = {
     bg     = { 0.165, 0.114, 0.078 }, -- umber
     fg     = { 0.867, 0.824, 0.722 }, -- bone
-    accent = { 0.557, 0.157, 0.157 }, -- ink-red
-    gold   = { 0.718, 0.588, 0.337 },
-    dim_fg = { 0.541, 0.510, 0.408 }, -- dim parchment
+    accent = { 0.557, 0.157, 0.157 }, -- ink-red (focus marker, danger)
+    gold   = { 0.718, 0.588, 0.337 }, -- ceremonial section labels (Mission Team header)
+    amber  = { 0.78, 0.45, 0.18 },    -- warm fill for active/selected segments, primary buttons
+    dim_fg = { 0.541, 0.510, 0.408 }, -- dim parchment (inactive labels, hints)
 }
 
 -- Colors as {r, g, b} in 0..1 (LÖVE's range). The checkerboard alternates these

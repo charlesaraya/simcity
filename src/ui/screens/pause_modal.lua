@@ -1,30 +1,38 @@
 -- src/ui/screens/pause_modal.lua
--- In-game overlay opened by Esc. The iso world stays visible underneath
--- (main draws the world first, then mgr:draw overlays this on top — and the
--- sim-tick gate, driven by mgr:should_tick, halts time while we're up).
+-- In-game overlay opened by Esc. The iso world stays visible behind a
+-- translucent umber backdrop (main draws the world first, then mgr:draw
+-- overlays this on top), and the sim-tick gate halts time while we're up.
 --
--- Same structural shape as Home — selected/options/actions, keyboard +
--- mouse — but Esc means RESUME here, not end_transmission. The two screens
--- share enough to invite a MenuList widget, but a third instance (step 6's
--- New Mission is a FORM, not a list, and step 9's Mission Control is more
--- complex) hasn't appeared yet, so we keep both concrete for now and revisit.
+-- Visual register matches Home: outlined panel sized to its rows, full-width
+-- option rectangles, selected row scanline-amber with a leading ▶ marker,
+-- unselected rows outlined.
 --
--- Actions are injected: main.lua passes closures that pop the modal, save
--- and load through the persistence layer, return to Home, or quit.
+-- Selection nav:
+--   ↑/↓   move selection (clamped)
+--   Enter / kpenter  fire the action for the selected option
+--   Esc   fires RESUME (modal-close)
+--
+-- Direct hotkeys (any focus): R resume · S save · L load · M mission control ·
+--   Q end transmission. Pressing one selects that row AND fires its action.
 
 local PauseModal   = {}
 PauseModal.__index = PauseModal
 
-local START_Y = 240
-local ROW_H   = 44
+local PANEL_TOP_Y = 200
+local PANEL_PAD   = 24
+local ROW_H       = 60
+local ROWS_TOP_Y  = PANEL_TOP_Y + PANEL_PAD
 
 local OPTIONS = {
-    { key = "resume",            label = "Resume Operation" },
-    { key = "save_to_archive",   label = "Save to Archive" },
-    { key = "load_from_archive", label = "Load from Archive" },
-    { key = "mission_control",   label = "Mission Control" },
-    { key = "end_transmission",  label = "End Transmission" },
+    { key = "resume",            label = "RESUME OPERATION",  hotkey = "r" },
+    { key = "save_to_archive",   label = "SAVE TO ARCHIVE",   hotkey = "s" },
+    { key = "load_from_archive", label = "LOAD FROM ARCHIVE", hotkey = "l" },
+    { key = "mission_control",   label = "MISSION CONTROL",   hotkey = "m" },
+    { key = "end_transmission",  label = "END TRANSMISSION",  hotkey = "q" },
 }
+
+local HOTKEY_TO_INDEX = {}
+for i, opt in ipairs(OPTIONS) do HOTKEY_TO_INDEX[opt.hotkey] = i end
 
 function PauseModal.new(actions)
     local self = setmetatable({}, PauseModal)
@@ -55,22 +63,26 @@ function PauseModal:keypressed(key)
     elseif key == "return" or key == "kpenter" then
         fire(self, self.options[self.selected].key)
     elseif key == "escape" then
-        -- The distinguishing rule vs Home: Esc on a modal CLOSES the modal,
-        -- i.e. fires the resume action. The action closure in main pops the
-        -- modal off the stack; the sim-tick gate releases on the next frame.
+        -- Esc on a modal CLOSES the modal — fires resume regardless of focus.
         fire(self, "resume")
+    else
+        local i = HOTKEY_TO_INDEX[key]
+        if i then
+            self.selected = i
+            fire(self, self.options[i].key)
+        end
     end
 end
 
 -- GEOMETRY (pure, shared by hit-test and draw) ------------------------------
 
 function PauseModal:row_center(i)
-    return 0, START_Y + (i - 1) * ROW_H + ROW_H * 0.5
+    return 0, ROWS_TOP_Y + (i - 1) * ROW_H + ROW_H * 0.5
 end
 
 function PauseModal:row_at(_x, y)
-    if y < START_Y then return nil end
-    local i = math.floor((y - START_Y) / ROW_H) + 1
+    if y < ROWS_TOP_Y then return nil end
+    local i = math.floor((y - ROWS_TOP_Y) / ROW_H) + 1
     if i < 1 or i > #self.options then return nil end
     return i
 end
@@ -91,47 +103,63 @@ function PauseModal:mousepressed(x, y, button)
 end
 
 -- DRAW (love-only; run-verified) --------------------------------------------
--- A translucent umber backdrop covers the full window so the iso world tints
--- darker but stays legible; the modal frame and options sit centered on top.
--- "MISSION PAUSED" labels the state plainly so the modal is unambiguous even
--- on first encounter.
+-- Translucent umber backdrop over the iso world; "MISSION PAUSED" title above
+-- the framed panel; then the option rows in the same language as Home.
 
-local Theme = require("src.ui.theme")
+local Theme   = require("src.ui.theme")
+local Widgets = require("src.ui.widgets")
 
-local TITLE        = "MISSION PAUSED"
-local TITLE_Y      = 160
-local BACKDROP_A   = 0.78 -- alpha of the umber tint over the iso world
+local TITLE      = "MISSION PAUSED"
+local TITLE_Y    = 140
+local BACKDROP_A = 0.85 -- near-opaque black veil over the running iso
+local MARKER     = "▶"
 
 function PauseModal:draw()
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local W, H = love.graphics.getWidth(), love.graphics.getHeight()
 
-    -- Translucent backdrop. Uses the C.UI.bg umber so the modal sits in the
-    -- same visual register as the menu screens, just over the running world.
-    local bg = Theme.color("bg")
-    love.graphics.setColor(bg[1], bg[2], bg[3], BACKDROP_A)
-    love.graphics.rectangle("fill", 0, 0, w, h)
+    -- Backdrop: a dark veil so the iso world dims well behind the modal but
+    -- stays faintly visible (situational awareness without competing focus).
+    love.graphics.setColor(0, 0, 0, BACKDROP_A)
+    love.graphics.rectangle("fill", 0, 0, W, H)
 
-    -- Title (slab serif display, bone)
+    -- Title above the panel.
     love.graphics.setFont(Theme.font("display"))
     love.graphics.setColor(Theme.color("fg"))
-    local tw = love.graphics.getFont():getWidth(TITLE)
-    love.graphics.print(TITLE, (w - tw) * 0.5, TITLE_Y)
-
-    -- Options
-    love.graphics.setFont(Theme.font("heading"))
     local font = love.graphics.getFont()
+    local tw = font:getWidth(TITLE)
+    love.graphics.print(TITLE, (W - tw) * 0.5, TITLE_Y)
+
+    -- Solid umber panel (NOT translucent): fully blocks the iso below so the
+    -- modal reads as its own surface. Frame outline drawn on top.
+    local pw = W * 0.5
+    local px = (W - pw) * 0.5
+    local py = PANEL_TOP_Y
+    local ph = #self.options * ROW_H + PANEL_PAD * 2
+    love.graphics.setColor(Theme.color("bg"))
+    love.graphics.rectangle("fill", px, py, pw, ph)
+    Widgets.frame(px, py, pw, ph)
+
+    -- Rows.
+    local row_x = px + PANEL_PAD
+    local row_w = pw - PANEL_PAD * 2
+    local row_inner_h = ROW_H - 8
+
+    love.graphics.setFont(Theme.font("heading"))
+    font = love.graphics.getFont()
+
     for i, opt in ipairs(self.options) do
-        local _, cy = self:row_center(i)
-        local y = cy - font:getHeight() * 0.5
+        local ry = ROWS_TOP_Y + (i - 1) * ROW_H + 4
+        local text_y = ry + (row_inner_h - font:getHeight()) * 0.5
+
         if i == self.selected then
-            love.graphics.setColor(Theme.color("accent"))
-            local label = "› " .. opt.label
-            local lw = font:getWidth(label)
-            love.graphics.print(label, (w - lw) * 0.5, y)
+            Widgets.scanline_fill(row_x, ry, row_w, row_inner_h)
+            love.graphics.setColor(Theme.color("bg"))
+            love.graphics.print(MARKER, row_x + 20, text_y)
+            love.graphics.print(opt.label, row_x + 64, text_y)
         else
+            Widgets.outline(row_x, ry, row_w, row_inner_h)
             love.graphics.setColor(Theme.color("fg"))
-            local lw = font:getWidth(opt.label)
-            love.graphics.print(opt.label, (w - lw) * 0.5, y)
+            love.graphics.print(opt.label, row_x + 64, text_y)
         end
     end
 end

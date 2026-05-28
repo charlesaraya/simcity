@@ -96,6 +96,37 @@ describe("Home keyboard nav", function()
     end)
 end)
 
+describe("Home direct hotkeys", function()
+    -- Each option exposes a single-letter shortcut shown on the row's right.
+    -- Pressing it from ANY focus selects that row AND fires the action.
+    local HOTKEYS = {
+        { hotkey = "c", key = "continue",         index = 1 },
+        { hotkey = "n", key = "new_mission",      index = 2 },
+        { hotkey = "l", key = "archive",          index = 3 },
+        { hotkey = "s", key = "settings",         index = 4 },
+        { hotkey = "q", key = "end_transmission", index = 5 },
+    }
+
+    for _, spec in ipairs(HOTKEYS) do
+        it(("%q fires %s from any focus"):format(spec.hotkey, spec.key), function()
+            local actions, calls = actions_stub()
+            local h = Home.new(actions)
+            h.selected = 1
+            h:keypressed(spec.hotkey)
+            assert.are.same({ spec.key }, calls)
+            assert.are.equal(spec.index, h.selected) -- selection follows hotkey
+        end)
+    end
+
+    it("every option exposes a hotkey field", function()
+        local h = Home.new(actions_stub())
+        for _, opt in ipairs(h.options) do
+            assert.is_string(opt.hotkey)
+            assert.are.equal(1, #opt.hotkey)
+        end
+    end)
+end)
+
 describe("Home mouse", function()
     it("mousemoved over a row sets selected to that row", function()
         local h = Home.new(actions_stub())

@@ -13,6 +13,7 @@ describe("Theme.color", function()
         assert.are.same(C.UI.fg, Theme.color("fg"))
         assert.are.same(C.UI.accent, Theme.color("accent"))
         assert.are.same(C.UI.gold, Theme.color("gold"))
+        assert.are.same(C.UI.amber, Theme.color("amber"))
         assert.are.same(C.UI.dim_fg, Theme.color("dim_fg"))
     end)
 
@@ -21,7 +22,7 @@ describe("Theme.color", function()
     end)
 
     it("the palette uses 0..1 floats (LÖVE's color range)", function()
-        for _, name in ipairs({ "bg", "fg", "accent", "gold", "dim_fg" }) do
+        for _, name in ipairs({ "bg", "fg", "accent", "gold", "amber", "dim_fg" }) do
             local c = Theme.color(name)
             for _, ch in ipairs(c) do
                 assert.is_true(ch >= 0 and ch <= 1,
@@ -54,10 +55,10 @@ describe("Theme.init / Theme.font", function()
     it("loads display + heading + body + meta fonts from the configured paths", function()
         local loader, calls = loader_stub()
         Theme.init(loader)
-        assert.are.equal("font<assets/fonts/IBMPlexSerif-Bold.ttf@28>", Theme.font("display"))
-        assert.are.equal("font<assets/fonts/IBMPlexSerif-Bold.ttf@20>", Theme.font("heading"))
-        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@16>", Theme.font("body"))
-        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@13>", Theme.font("meta"))
+        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@20>", Theme.font("display"))
+        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@14>", Theme.font("heading"))
+        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@12>", Theme.font("body"))
+        assert.are.equal("font<assets/fonts/IBMPlexMono-Regular.ttf@10>", Theme.font("meta"))
         assert.are.equal(4, #calls) -- one loader call per role
     end)
 

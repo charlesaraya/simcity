@@ -8,16 +8,20 @@ local C = require("src.world.constants")
 
 local Theme = {}
 
--- Role -> (path, size). The four roles cover the screens' type rhythm:
---   display = title/screen headings (slab serif, biggest)
---   heading = section headings (slab serif, mid)
---   body    = body, data, lists (mono)
---   meta    = small captions, status strips (mono, small)
+-- Role -> (path, size). All roles now use IBM Plex Mono Regular — one face,
+-- normal weight, size carries the hierarchy. Suits the terminal-CRT visual
+-- register (see new_mission / Home) better than mixed serif + mono ever did.
+--   display = title strip (largest mono)
+--   heading = row / option labels
+--   body    = control labels (segmented cells, buttons, list rows)
+--   meta    = captions, hints, dim labels
+-- The Plex Serif Bold asset stays shipped for now in case a future ceremonial
+-- accent wants it, but no role currently loads it.
 local SPECS = {
-    display = { "assets/fonts/IBMPlexSerif-Bold.ttf", 28 },
-    heading = { "assets/fonts/IBMPlexSerif-Bold.ttf", 20 },
-    body    = { "assets/fonts/IBMPlexMono-Regular.ttf", 16 },
-    meta    = { "assets/fonts/IBMPlexMono-Regular.ttf", 13 },
+    display = { "assets/fonts/IBMPlexMono-Regular.ttf", 20 },
+    heading = { "assets/fonts/IBMPlexMono-Regular.ttf", 14 },
+    body    = { "assets/fonts/IBMPlexMono-Regular.ttf", 12 },
+    meta    = { "assets/fonts/IBMPlexMono-Regular.ttf", 10 },
 }
 
 local fonts = nil
