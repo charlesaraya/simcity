@@ -16,6 +16,17 @@ C.TILE         = {
     GRASS = 1,
 }
 
+-- Menu-screen palette: "archaic-future / dossier-formal" (Foundation/Dune).
+-- Distinct from C.COLOR.* which the in-game iso world uses, so the
+-- terminal-style UI and the painterly map keep their own moods.
+C.UI           = {
+    bg     = { 0.165, 0.114, 0.078 }, -- umber
+    fg     = { 0.867, 0.824, 0.722 }, -- bone
+    accent = { 0.557, 0.157, 0.157 }, -- ink-red
+    gold   = { 0.718, 0.588, 0.337 },
+    dim_fg = { 0.541, 0.510, 0.408 }, -- dim parchment
+}
+
 -- Colors as {r, g, b} in 0..1 (LÖVE's range). The checkerboard alternates these
 -- so we can SEE individual tiles and catch picking bugs.
 C.COLOR        = {
@@ -117,8 +128,8 @@ C.GROWTH       = {
 -- the commercial/industrial base. A res-only town is break-even; commerce and
 -- industry turn the profit that funds everything else.
 C.ECON         = {
-    TAX_RATE       = 1, -- per job, per month
-    UPKEEP         = 2, -- per completed BUSINESS (commerce/industry), per month
+    TAX_RATE       = 1,    -- per job, per month
+    UPKEEP         = 2,    -- per completed BUSINESS (commerce/industry), per month
     START_TREASURY = 1500, -- runway to lay roads + a first plant before tax income ramps
 }
 
