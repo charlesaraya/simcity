@@ -1,7 +1,6 @@
 -- src/systems/land_value.lua
 -- Land value is derived from pollution = clamp(BASE - K_POLLUTION * pollution, MIN, MAX).
 
-local Grid = require("src.world.grid")
 local Pollution = require("src.systems.pollution")
 local C = require("src.world.constants")
 
@@ -17,16 +16,6 @@ end
 -- READ: land value at (x, y). A clean tile reads BASE.
 function LandValue.at(world, x, y)
     return value_for(Pollution.at(world, x, y))
-end
-
--- READ: {idx -> land value} for every polluted tile (the ones that differ from
--- BASE). Convenience for the overlay; clean tiles are implicitly BASE.
-function LandValue.field(world)
-    local out = {}
-    for idx, pollution in pairs(world.pollution.field) do
-        out[idx] = value_for(pollution)
-    end
-    return out
 end
 
 return LandValue

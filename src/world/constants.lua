@@ -208,9 +208,12 @@ C.OVERLAY      = {
 
 -- Heatmap color stops (green -> yellow -> red). Pollution reads high = bad (red);
 -- land value is the inverse (high = good = green), so its stops are reversed.
+-- The power overlay is BINARY (served / unserved), not a ramp -- a fixed 2-stop
+-- pair keeps it independent of the pollution ramp's stops.
 C.RAMP         = {
     POLLUTION  = { { 0.25, 0.65, 0.30 }, { 0.90, 0.80, 0.25 }, { 0.80, 0.25, 0.20 } },
     LAND_VALUE = { { 0.80, 0.25, 0.20 }, { 0.90, 0.80, 0.25 }, { 0.25, 0.65, 0.30 } },
+    POWER      = { served = { 0.25, 0.65, 0.30 }, unserved = { 0.80, 0.25, 0.20 } },
 }
 
 -- Event names published by world-state writers (Principle 4).

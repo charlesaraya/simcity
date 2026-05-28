@@ -150,6 +150,11 @@ function love.update(dt)
 
     -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
     Runner.update(runner, dt * speed, world)
+
+    -- Keep the pollution-derived caches current for the overlays even between
+    -- growth ticks (or while paused): resolve is a no-op unless the field is
+    -- dirty, so this is a cheap dirty-check most frames.
+    Pollution.resolve(world)
 end
 
 function love.draw()
@@ -181,7 +186,7 @@ function love.keypressed(key)
         return
     end
     if key == "o" then
-        current_overlay = OVERLAY_CYCLE[current_overlay]
+        current_overlay = OVERLAY_CYCLE[current_overlay] or C.OVERLAY.NONE
     elseif key == "space" then
         speed = (speed == C.SPEED.PAUSED) and C.SPEED.NORMAL or C.SPEED.PAUSED
     elseif key == "+" or key == "=" or key == "kp+" then

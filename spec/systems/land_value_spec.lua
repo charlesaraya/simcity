@@ -41,13 +41,3 @@ describe("LandValue.at", function()
     end)
 end)
 
-describe("LandValue.field", function()
-    before_each(function() Bus.clear() end)
-
-    it("maps polluted tiles to their land value", function()
-        local w = World.new(1)
-        set_pollution(w, 3, 3, 10)
-        local field = LandValue.field(w)
-        assert.are.equal(C.LAND.BASE - C.LAND.K_POLLUTION * 10, field[Grid.idx(w.grid, 3, 3)])
-    end)
-end)

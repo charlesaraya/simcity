@@ -44,9 +44,9 @@ function Overlays.color(overlay, world, x, y, lo, hi)
         local idx = Grid.idx(world.grid, x, y)
         local conductor = tile.road or tile.power_line or tile.plant or tile.plant_part
         if (world.power.powered or {})[idx] or (tile.building and Power.building_powered(world, x, y)) then
-            return C.RAMP.POLLUTION[1] -- green = served
+            return C.RAMP.POWER.served
         elseif conductor or tile.building then
-            return C.RAMP.POLLUTION[3] -- red = unpowered infra/building
+            return C.RAMP.POWER.unserved
         end
         return nil
     end
