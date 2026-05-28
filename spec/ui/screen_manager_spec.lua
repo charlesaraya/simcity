@@ -198,6 +198,28 @@ describe("ScreenManager dispatch (update / input)", function()
         end)
     end)
 
+    it("routes textinput to the top active surface", function()
+        local mgr = ScreenManager.new()
+        local home, pause = screen_stub(), screen_stub()
+        home.textinput = function(self, t)
+            self.hits[#self.hits + 1] = { name = "textinput", args = { t } }
+        end
+        pause.textinput = function(self, t)
+            self.hits[#self.hits + 1] = { name = "textinput", args = { t } }
+        end
+        mgr:register("home", home)
+        mgr:register("pause", pause)
+        mgr:set_current("home")
+        mgr:textinput("a")
+        assert.are.equal(1, #home.hits)
+        assert.are.same({ "a" }, home.hits[1].args)
+        mgr:push_modal("pause")
+        mgr:textinput("b")
+        assert.are.equal(1, #home.hits) -- unchanged
+        assert.are.equal(1, #pause.hits)
+        assert.are.same({ "b" }, pause.hits[1].args)
+    end)
+
     it("routes mousemoved to the top active surface", function()
         local mgr = ScreenManager.new()
         local home, pause = screen_stub(), screen_stub()

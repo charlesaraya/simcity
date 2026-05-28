@@ -415,9 +415,12 @@ local function in_game_active()
 end
 
 function love.keypressed(key)
-    -- Menu/modal first; they consume input when active.
+    -- Snapshot before dispatching to mgr: a menu key (e.g. Enter on the
+    -- Charter button) flips in_game to true mid-call, but the SAME keystroke
+    -- must not then re-fire as in-game input.
+    local was_in_game = in_game_active()
     mgr:keypressed(key)
-    if not in_game_active() then return end
+    if not was_in_game then return end
 
     -- Esc in-game opens the Pause modal. Once it's pushed, the next
     -- keypressed (incl. another Esc) routes to the modal, not here.
@@ -459,9 +462,13 @@ end
 
 -- Begin a road/zone drag: anchor on the tile under the cursor (in tile coords,
 -- so panning mid-drag doesn't move the anchor). Bulldoze isn't a drag tool.
+-- The snapshot of in_game_active BEFORE dispatching to mgr is what gates the
+-- in-game branch -- a Charter button click transitions to in_game during the
+-- mgr call, but we must not then re-fire the SAME click as a zoning action.
 function love.mousepressed(x, y, button)
+    local was_in_game = in_game_active()
     mgr:mousepressed(x, y, button)
-    if not in_game_active() then return end
+    if not was_in_game then return end
     if button ~= 1 then return end
     local tx, ty = hovered_tile()
     if not tx then return end
@@ -476,8 +483,9 @@ end
 -- Commit the drag on release. apply_run/apply_rect are all-or-nothing and
 -- self-validating, so an invalid/unaffordable drag is a safe no-op.
 function love.mousereleased(x, y, button)
+    local was_in_game = in_game_active()
     mgr:mousereleased(x, y, button)
-    if not in_game_active() then return end
+    if not was_in_game then return end
     if button ~= 1 or not drag_start then return end
     local cx, cy = hovered_tile()
     if cx then
@@ -494,6 +502,12 @@ end
 
 -- Hover routing for menu screens (Home highlights the row under the cursor).
 -- In-game has no hover-driven state, so this is menu-only.
+-- Text input routes to menu screens (mission-name rename on the charter).
+-- Discarded when nothing is up; in-game has no text-field UI.
+function love.textinput(text)
+    mgr:textinput(text)
+end
+
 function love.mousemoved(x, y)
     mgr:mousemoved(x, y)
 end

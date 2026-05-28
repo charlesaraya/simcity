@@ -210,18 +210,17 @@ C.LAND         = {
     MAX         = 100, --   of snapping to red around any industry
 }
 
--- Map overlay views (derived-state heatmaps). NONE = normal terrain render.
+-- Map overlay views.
 C.OVERLAY      = {
-    NONE       = 0,
+    NONE       = 0, -- normal terrain render.
     POLLUTION  = 1,
     LAND_VALUE = 2,
     POWER      = 3,
 }
 
 -- Heatmap color stops (green -> yellow -> red). Pollution reads high = bad (red);
--- land value is the inverse (high = good = green), so its stops are reversed.
--- The power overlay is BINARY (served / unserved), not a ramp -- a fixed 2-stop
--- pair keeps it independent of the pollution ramp's stops.
+-- land value is the inverse (high = good = green).
+-- The power overlay is BINARY (served / unserved).
 C.RAMP         = {
     POLLUTION  = { { 0.25, 0.65, 0.30 }, { 0.90, 0.80, 0.25 }, { 0.80, 0.25, 0.20 } },
     LAND_VALUE = { { 0.80, 0.25, 0.20 }, { 0.90, 0.80, 0.25 }, { 0.25, 0.65, 0.30 } },
@@ -286,6 +285,28 @@ C.MISSION      = {
     TEAM_SIZE_MAX      = 5,
     TEAM_SIZE_DEFAULT  = 3,
     DEFAULT_DIFFICULTY = "first_mission", -- placeholder until 4c-2 wires presets
+}
+
+-- World Parameters set on the charter screen. Cosmetic in 4c-1: stored on
+-- world.mission.world_params and displayed on Archive, but not wired to sim
+-- tunables. Each field carries its enum choices + a default index.
+C.WORLD_PARAMS = {
+    size = {
+        choices = { "Small", "Medium", "Large" },
+        default = 2,
+    },
+    climate = {
+        choices = { "Temperate", "Arid", "Frozen" },
+        default = 1,
+    },
+    hostility = {
+        choices = { "Low", "Medium", "High" },
+        default = 1,
+    },
+    funds = {
+        choices = { "Austere", "Standard", "Generous" },
+        default = 2,
+    },
 }
 
 return C

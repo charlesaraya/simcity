@@ -130,6 +130,13 @@ function ScreenManager:mousemoved(x, y)
     call(active(self), "mousemoved", x, y)
 end
 
+-- love.textinput is keyboard text events (the IME / locale-aware typing
+-- pipeline, distinct from keypressed). Routes to the active surface so
+-- text fields on a screen can accumulate characters.
+function ScreenManager:textinput(text)
+    call(active(self), "textinput", text)
+end
+
 function ScreenManager:wheelmoved(dx, dy)
     call(active(self), "wheelmoved", dx, dy)
 end

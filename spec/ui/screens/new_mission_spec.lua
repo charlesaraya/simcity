@@ -64,11 +64,13 @@ end)
 describe("NewMission focus nav", function()
     it("Tab / down advances focus, clamped at the last field", function()
         local s = fresh()
-        s:keypressed("tab"); assert.are.equal(2, s.focused)
-        s:keypressed("down"); assert.are.equal(3, s.focused)
-        s:keypressed("tab"); assert.are.equal(4, s.focused)
-        s:keypressed("tab"); assert.are.equal(5, s.focused)
-        s:keypressed("tab"); assert.are.equal(5, s.focused) -- clamped
+        -- 9 fields total: name, difficulty, team_size, size, climate, hostility,
+        -- funds, back, charter. Walk to the end + one extra to confirm clamp.
+        for i = 2, 9 do
+            s:keypressed("tab")
+            assert.are.equal(i, s.focused)
+        end
+        s:keypressed("tab"); assert.are.equal(9, s.focused) -- clamped
     end)
 
     it("Shift-Tab / up retreats, clamped at the first field", function()
@@ -89,9 +91,83 @@ describe("NewMission focus nav", function()
     end)
 end)
 
+describe("NewMission inline rename (mission name)", function()
+    it("textinput appends to mission_name when name field is focused", function()
+        local s = fresh()
+        s.focused = 1
+        s.mission_name = "AB"
+        s.caret = 2
+        s:textinput("C")
+        assert.are.equal("ABC", s.mission_name)
+        assert.are.equal(3, s.caret)
+    end)
+
+    it("textinput inserts at caret position (not end-of-string)", function()
+        local s = fresh()
+        s.focused = 1
+        s.mission_name = "AB"
+        s.caret = 1
+        s:textinput("X")
+        assert.are.equal("AXB", s.mission_name)
+        assert.are.equal(2, s.caret)
+    end)
+
+    it("textinput is ignored when a different field is focused", function()
+        local s = fresh()
+        s.focused = 2 -- difficulty
+        local before = s.mission_name
+        s:textinput("X")
+        assert.are.equal(before, s.mission_name)
+    end)
+
+    it("backspace on name field deletes the char left of the caret", function()
+        local s = fresh()
+        s.focused = 1
+        s.mission_name = "Hello"
+        s.caret = #s.mission_name
+        s:keypressed("backspace")
+        assert.are.equal("Hell", s.mission_name)
+        assert.are.equal(4, s.caret)
+    end)
+
+    it("left/right arrows move the caret while editing the name", function()
+        local s = fresh()
+        s.focused = 1
+        s.mission_name = "AB"
+        s.caret = 2
+        s:keypressed("left"); assert.are.equal(1, s.caret)
+        s:keypressed("left"); assert.are.equal(0, s.caret)
+        s:keypressed("left"); assert.are.equal(0, s.caret) -- clamped
+        s:keypressed("right"); assert.are.equal(1, s.caret)
+        s:keypressed("right"); assert.are.equal(2, s.caret)
+        s:keypressed("right"); assert.are.equal(2, s.caret) -- clamped
+    end)
+
+    it("R does NOT re-roll while the name field is focused (so 'r' is typeable)", function()
+        local s = fresh()
+        s.focused = 1
+        local before = s.mission_name
+        s:keypressed("r")
+        -- Nothing happened: re-roll skipped, and 'r' arrives as textinput, not keypressed.
+        assert.are.equal(before, s.mission_name)
+    end)
+
+    it("textinput respects a max length so the buffer can't grow forever", function()
+        local s = fresh()
+        s.focused = 1
+        s.mission_name = string.rep("A", 100) -- already past whatever the cap is
+        local before = s.mission_name
+        s:textinput("Z")
+        assert.are.equal(before, s.mission_name) -- no append
+    end)
+end)
+
 describe("NewMission re-roll (R key)", function()
     it("R re-rolls mission_name AND crew", function()
         local s = fresh(7)
+        -- Move off the name field; on it, R is typed into the rename buffer
+        -- instead of re-rolling (10d inline rename behavior).
+        s.focused = 2
         local before_name = s.mission_name
         local before_crew_1 = s.crew[1].name
         s:keypressed("r")
@@ -170,10 +246,43 @@ describe("NewMission difficulty cycle", function()
     end)
 end)
 
+describe("NewMission world params (indices 4..7)", function()
+    -- WP fields: 4 size, 5 climate, 6 hostility, 7 funds. Each cycles via
+    -- Left/Right within its choices list (clamped).
+    local WP = {
+        { field = "size",      focus = 4 },
+        { field = "climate",   focus = 5 },
+        { field = "hostility", focus = 6 },
+        { field = "funds",     focus = 7 },
+    }
+
+    for _, spec in ipairs(WP) do
+        it(("Left/Right on %s cycles clamped within choices"):format(spec.field), function()
+            local s = fresh()
+            s.focused = spec.focus
+            local n = #C.WORLD_PARAMS[spec.field].choices
+            for _ = 1, n + 5 do s:keypressed("right") end
+            assert.are.equal(n, s.wp_idx[spec.field])
+            for _ = 1, n + 5 do s:keypressed("left") end
+            assert.are.equal(1, s.wp_idx[spec.field])
+        end)
+    end
+
+    it("Left/Right on non-WP fields does not touch wp_idx", function()
+        local s = fresh()
+        s.focused = 1 -- mission_name
+        local snapshot = {}
+        for k, v in pairs(s.wp_idx) do snapshot[k] = v end
+        s:keypressed("right"); s:keypressed("left")
+        for k, v in pairs(snapshot) do assert.are.equal(v, s.wp_idx[k]) end
+    end)
+end)
+
 describe("NewMission Back / Charter actions", function()
+    -- Back is field index 8, Charter is 9 (after the 4 world-param fields).
     it("Enter on Back focus fires back", function()
         local s, calls = fresh()
-        s.focused = 4
+        s.focused = 8
         s:keypressed("return")
         assert.are.equal(1, #calls)
         assert.are.equal("back", calls[1].name)
@@ -181,7 +290,7 @@ describe("NewMission Back / Charter actions", function()
 
     it("Enter on Charter focus fires charter with {mission, crew}", function()
         local s, calls = fresh()
-        s.focused = 5
+        s.focused = 9
         s:keypressed("return")
         assert.are.equal(1, #calls)
         assert.are.equal("charter", calls[1].name)
@@ -190,11 +299,17 @@ describe("NewMission Back / Charter actions", function()
         assert.is_string(payload.mission.name)
         assert.are.equal("first_mission", payload.mission.difficulty)
         assert.are.equal(s.team_size, #payload.crew)
+        -- World params travel as keyed string values, not indices.
+        assert.is_table(payload.mission.world_params)
+        assert.is_string(payload.mission.world_params.size)
+        assert.is_string(payload.mission.world_params.climate)
+        assert.is_string(payload.mission.world_params.hostility)
+        assert.is_string(payload.mission.world_params.funds)
     end)
 
     it("kpenter also confirms a button", function()
         local s, calls = fresh()
-        s.focused = 4
+        s.focused = 8
         s:keypressed("kpenter")
         assert.are.equal("back", calls[1].name)
     end)
