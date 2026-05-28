@@ -164,6 +164,35 @@ local function fmt_money(n)
     return ("₡%d"):format(n)
 end
 
+-- Real-seconds time_played -> "Xh YYm" (or "Ym" under an hour). Em-dash for
+-- nil / 0 (a fresh save with no ticking sim time).
+local function fmt_played(seconds)
+    if not seconds or seconds <= 0 then return "—" end
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    if h > 0 then return ("%dh %02dm"):format(h, m) end
+    return ("%dm"):format(m)
+end
+
+-- Unix saved_at timestamp -> human-readable relative phrase. Uses os.date so
+-- the local timezone shows; em-dash when missing.
+local function fmt_saved(ts)
+    if not ts then return "—" end
+    local now = os.time()
+    local delta = now - ts
+    if delta < 60 then return "JUST NOW" end
+    if delta < 3600 then return ("%d MIN AGO"):format(math.floor(delta / 60)) end
+    local today = os.date("*t", now)
+    local then_d = os.date("*t", ts)
+    if today.year == then_d.year and today.yday == then_d.yday then
+        return string.upper(os.date("TODAY %H:%M", ts))
+    end
+    if today.year == then_d.year and (today.yday - then_d.yday == 1) then
+        return string.upper(os.date("YESTERDAY %H:%M", ts))
+    end
+    return string.upper(os.date("%Y-%m-%d", ts))
+end
+
 -- Column x-offsets within the row. Tuned so the header alignment matches.
 local COLS = {
     NUM      = 28,
@@ -283,16 +312,15 @@ function Archive:draw()
         love.graphics.setFont(Theme.font("body"))
         love.graphics.setColor(Theme.color("fg"))
         love.graphics.print(string.upper(s.mission_name or "UNTITLED"), px + 24, dy + 36)
-        -- PLAYED / SAVED placeholders -- 4c-2 will fill these from a metadata
-        -- sidecar; for 4c-1 we don't track time-played, so show em dashes.
+        -- PLAYED / SAVED populated from the meta sidecar (Phase 4c-2).
         love.graphics.setFont(Theme.font("meta"))
         love.graphics.setColor(Theme.color("dim_fg"))
         local right_x = px + pw - 280
         love.graphics.print("PLAYED",      right_x,       dy + 14)
         love.graphics.print("SAVED",       right_x + 110, dy + 14)
         love.graphics.setColor(Theme.color("fg"))
-        love.graphics.print("—",           right_x,       dy + 36)
-        love.graphics.print("—",           right_x + 110, dy + 36)
+        love.graphics.print(fmt_played(s.time_played), right_x,       dy + 36)
+        love.graphics.print(fmt_saved(s.saved_at),     right_x + 110, dy + 36)
     end
 
     -- Hint strip beneath the detail.

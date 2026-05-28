@@ -29,6 +29,7 @@ local Iso = require("src.render.iso")
 local Renderer = require("src.render.renderer")
 local Hud = require("src.ui.hud")
 local Save = require("src.persistence.save")
+local Meta = require("src.persistence.meta")
 local Theme = require("src.ui.theme")
 local ScreenManager = require("src.ui.screen_manager")
 local Home = require("src.ui.screens.home")
@@ -45,13 +46,14 @@ local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
 local current_overlay = C.OVERLAY.NONE
 
--- Save slot the live mission belongs to. F5 / pause "Save to Archive" write
--- here; "Continue Operations" loads the highest filled slot; New Mission
--- claims the first free one. Multi-slot pulled forward from 4c-2's scope so
--- the Archive UI actually has more than one row to show; the slug + metadata
--- sidecar layout that PRD calls out is still deferred (slot numbers 1..MAX).
-local MAX_SLOTS  = 6
-local current_slot = nil -- nil until a mission is started or loaded
+-- Save slug the live mission belongs to (Phase 4c-2: slug-based on-disk
+-- layout, saves/<slug>/world.lua + meta.lua). F5 / pause "Save to Archive"
+-- write here; "Continue Operations" loads the newest by saved_at; New
+-- Mission mints a slug at charter time from the chosen mission name.
+local current_slug = nil
+-- Real seconds the player has spent in this mission with the sim ticking.
+-- Stamped into meta.time_played on save; restored on load.
+local mission_elapsed = 0
 
 -- Overlay cycle order for the [O] key: off -> pollution -> land value -> power -> off.
 local OVERLAY_CYCLE = {
@@ -156,25 +158,22 @@ local function fresh_seed()
     return os.time() + micros + seed_counter
 end
 
--- Find the first slot 1..MAX_SLOTS with no file on disk. Returns MAX_SLOTS
--- when all are full (the chartering player overwrites the highest slot --
--- explicit recycling instead of refusing to start). 4c-2 will add slot-
--- management UI (delete, rename) to make this less surprising.
-local function next_free_slot()
-    for i = 1, MAX_SLOTS do
-        if not Save.load(i) then return i end
-    end
-    return MAX_SLOTS
+-- Build the meta sidecar table for the live world. Stamps saved_at to now
+-- and reads the current mission_elapsed counter as time_played.
+local function build_meta()
+    return Meta.from_world(world, {
+        slug        = current_slug,
+        saved_at    = os.time(),
+        time_played = math.floor(mission_elapsed),
+        population  = World.population(world),
+    })
 end
 
--- Find the highest slot number with a save on disk, or nil if none. Used by
--- Continue Operations to mean "the most recent" -- without saved_at sidecars
--- (4c-2), highest-numbered = most recently allocated, which is good enough.
-local function latest_filled_slot()
-    for i = MAX_SLOTS, 1, -1 do
-        if Save.load(i) then return i end
-    end
-    return nil
+-- Write both the world and its sidecar. The pair always stays in sync --
+-- one isn't useful without the other.
+local function persist()
+    Save.save(world, current_slug)
+    Meta.save(current_slug, build_meta())
 end
 
 -- Install a world (fresh or loaded) as the live mission: bind it to the
@@ -193,54 +192,59 @@ local function install_world(w)
     wire_world(world)
 end
 
--- Build a fresh mission from a seed and enter in-game. Claims the first free
--- save slot so subsequent F5 writes there instead of clobbering an existing
--- mission.
+-- Build a fresh mission from a seed and enter in-game. current_slug is left
+-- nil; the charter action mints one once the player has named the mission.
 local function start_mission(seed)
     install_world(World.new(seed))
-    current_slot = next_free_slot()
+    current_slug = nil
+    mission_elapsed = 0
     mgr.in_game = true
     mgr:clear_current()
 end
 
--- Load the most recent save (highest filled slot) into the live mission.
--- Returns true on success. Used by Home's Continue Operations.
+-- Load the most recent save (newest saved_at across all sidecars) into the
+-- live mission. Returns true on success. Used by Home's Continue Operations.
 local function load_into_mission()
-    local slot = latest_filled_slot()
-    if not slot then return false end
-    local loaded = Save.load(slot)
+    local metas = Meta.list()
+    if #metas == 0 then return false end
+    local newest = metas[1] -- Meta.list returns sorted desc by saved_at
+    local loaded = Save.load(newest.slug)
     if not loaded then return false end
     install_world(loaded)
-    current_slot = slot
+    current_slug = newest.slug
+    mission_elapsed = newest.time_played or 0
     return true
 end
 
--- Build a slot summary table from a loaded world. The Archive screen takes
--- pre-computed tables -- the persistence read happens here so the screen
--- stays headless-testable.
-local function build_slot_entry(slot_num, w)
-    local mission = w.mission or {}
-    local months = (w.clock and w.clock.months) or 0
+-- Convert a meta sidecar (Meta.list shape) into the table the Archive screen
+-- consumes. `ordinal` is a 1..N row index used for display only -- the slug
+-- is the stable identifier across reloads.
+local function build_slot_entry(ordinal, meta)
     return {
-        slot         = slot_num,
-        mission_name = mission.name,
-        cycle        = math.floor(months / C.SIM.MONTHS_PER_YEAR),
-        population   = World.population(w),
-        treasury     = w.treasury or 0,
-        difficulty   = mission.difficulty,
-        world        = w,
+        slot         = ordinal,
+        slug         = meta.slug,
+        mission_name = meta.mission_name,
+        cycle        = meta.cycle or 0,
+        population   = meta.population or 0,
+        treasury     = meta.treasury or 0,
+        difficulty   = meta.difficulty,
+        saved_at     = meta.saved_at,
+        time_played  = meta.time_played or 0,
+        world_params = meta.world_params,
     }
 end
 
--- Archive action closures. Back returns to Home; Continue installs the slot's
--- world directly (no re-load -- it was loaded once when the screen opened)
--- and binds current_slot so subsequent F5 writes there.
+-- Archive action closures. Back returns to Home; Continue loads the slot's
+-- world from disk by slug, installs it, and rebinds current_slug.
 local function archive_actions()
     return {
         back = function() mgr:set_current("home") end,
         continue = function(slot)
-            install_world(slot.world)
-            current_slot = slot.slot
+            local loaded = Save.load(slot.slug)
+            if not loaded then return end
+            install_world(loaded)
+            current_slug = slot.slug
+            mission_elapsed = slot.time_played or 0
             mgr.in_game = true
             mgr:clear_current()
         end,
@@ -248,17 +252,18 @@ local function archive_actions()
 end
 
 -- NewMission action closures. Back returns to Home; Charter commits the form:
--- start a fresh mission world, then call World.charter to populate crew +
--- mission on it. started_at is stamped here (wall-clock at acceptance), kept
--- off the screen so the screen stays pure.
+-- start a fresh mission world, populate crew + mission, then mint a unique
+-- slug from the chosen mission name (write-side identity binds here).
 local function new_mission_actions()
     return {
         back = function() mgr:set_current("home") end,
         charter = function(payload)
             local mission = payload.mission
-            mission.started_at = os.time() -- wall-clock stamp; date readout
-            start_mission(fresh_seed())    -- builds world/runner/wires; flips in_game on
+            mission.started_at = os.time()
+            start_mission(fresh_seed()) -- builds world/runner/wires; flips in_game on
             World.charter(world, mission, payload.crew)
+            current_slug = Meta.unique_slug(Meta.slugify(mission.name))
+            world.slug = current_slug -- written into the world too so loaded games know their home
         end,
     }
 end
@@ -282,12 +287,12 @@ local function home_actions()
             mgr:set_current("new_mission")
         end,
         archive = function()
-            -- Scan all slot files; build a metadata entry per filled slot.
-            -- 4c-2 will swap the eager world-load for cheap sidecar reads.
+            -- Cheap meta-sidecar scan (no world deserialization). Slots come
+            -- back sorted newest-first by saved_at; ordinals reflect that.
+            local metas = Meta.list()
             local slots = {}
-            for i = 1, MAX_SLOTS do
-                local loaded = Save.load(i)
-                if loaded then slots[#slots + 1] = build_slot_entry(i, loaded) end
+            for i, m in ipairs(metas) do
+                slots[i] = build_slot_entry(i, m)
             end
             mgr:register("archive", Archive.new({
                 slots = slots,
@@ -312,12 +317,10 @@ local function pause_actions()
             mgr:pop_modal()
         end,
         save_to_archive = function()
-            -- Write the live mission to its claimed slot. current_slot is set
-            -- at charter / continue / archive-load, so this is always defined
-            -- when the modal is open (in_game requires it).
-            Save.save(world, current_slot)
-            -- Stay on the modal so the player sees the menu after the action;
-            -- 4c-2 will surface a "Saved" flash in the modal frame.
+            -- Write the live mission's world AND its meta sidecar. current_slug
+            -- is set at charter / continue / archive-load.
+            persist()
+            -- Stay on the modal so the player sees the menu after the action.
         end,
         load_from_archive = function()
             if not load_into_mission() then return end -- silent no-op for now
@@ -356,6 +359,10 @@ function love.load()
     Theme.init(love.graphics.newFont)
     love.graphics.setFont(Theme.font("body"))
 
+    -- 4c-2: convert any pre-existing flat save1..6.lua files into the new
+    -- slug-based layout. Idempotent; harmless after the first run.
+    Save.migrate_legacy()
+
     mgr = ScreenManager.new()
     mgr:register("home", Home.new(home_actions()))
     mgr:register("pause_modal", PauseModal.new(pause_actions()))
@@ -378,6 +385,10 @@ function love.update(dt)
         end
         -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
         Runner.update(runner, dt * speed, world)
+        -- Track real seconds spent playing this mission with the sim ticking
+        -- (matches PRD's "Played" column on the Archive). Paused / menu time
+        -- doesn't count.
+        mission_elapsed = mission_elapsed + dt
     end
 
     -- Keep pollution-derived caches current for the overlays even between
@@ -446,16 +457,20 @@ function love.keypressed(key)
     elseif key == "-" or key == "kp-" then
         speed = C.SPEED.NORMAL
     elseif key == "f5" then
-        Save.save(world, current_slot)
-        flash("Saved")
+        if current_slug then
+            persist()
+            flash("Saved")
+        end
     elseif key == "f9" then
-        local loaded = Save.load(current_slot)
-        if loaded then
-            world = loaded
-            wire_world(world)
-            flash("Loaded")
-        else
-            flash("No save")
+        if current_slug then
+            local loaded = Save.load(current_slug)
+            if loaded then
+                world = loaded
+                wire_world(world)
+                flash("Loaded")
+            else
+                flash("No save")
+            end
         end
     end
 end
