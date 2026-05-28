@@ -192,10 +192,12 @@ local function install_world(w)
     wire_world(world)
 end
 
--- Build a fresh mission from a seed and enter in-game. current_slug is left
--- nil; the charter action mints one once the player has named the mission.
-local function start_mission(seed)
-    install_world(World.new(seed))
+-- Build a fresh mission from a seed and enter in-game. opts are forwarded to
+-- World.new (4c-2: difficulty overrides like start_treasury). current_slug
+-- is left nil; the charter action mints one once the player has named the
+-- mission.
+local function start_mission(seed, opts)
+    install_world(World.new(seed, opts))
     current_slug = nil
     mission_elapsed = 0
     mgr.in_game = true
@@ -251,19 +253,29 @@ local function archive_actions()
     }
 end
 
+-- Resolve a difficulty key to its `overrides` table (start_treasury, ...).
+local difficulties = require("src.ui.content.difficulties")
+local function overrides_for(diff_key)
+    for _, d in ipairs(difficulties) do
+        if d.key == diff_key then return d.overrides end
+    end
+    return nil
+end
+
 -- NewMission action closures. Back returns to Home; Charter commits the form:
--- start a fresh mission world, populate crew + mission, then mint a unique
--- slug from the chosen mission name (write-side identity binds here).
+-- start a fresh mission world with the selected difficulty's overrides,
+-- populate crew + mission, then mint a unique slug from the chosen name.
 local function new_mission_actions()
     return {
         back = function() mgr:set_current("home") end,
         charter = function(payload)
             local mission = payload.mission
             mission.started_at = os.time()
-            start_mission(fresh_seed()) -- builds world/runner/wires; flips in_game on
+            -- Apply difficulty tunables at world construction (4c-2).
+            start_mission(fresh_seed(), overrides_for(mission.difficulty))
             World.charter(world, mission, payload.crew)
             current_slug = Meta.unique_slug(Meta.slugify(mission.name))
-            world.slug = current_slug -- written into the world too so loaded games know their home
+            world.slug = current_slug
         end,
     }
 end

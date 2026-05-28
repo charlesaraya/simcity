@@ -30,13 +30,16 @@ end
 -- Build a new world. The grid is all grass; the RNG is seeded so growth is
 -- reproducible; demand starts neutral; the treasury starts funded and the
 -- economy's last-net readout at zero.
-function World.new(seed)
+-- opts (4c-2): per-mission overrides applied at construction. Currently just
+-- start_treasury (set by the difficulty preset chosen on the charter screen).
+function World.new(seed, opts)
+    opts = opts or {}
     return {
         grid = Grid.new(),
         rng = RNG.new(seed),
         demand = { residential = 0, commercial = 0, industrial = 0 },
-        clock = { months = 0 },                    -- elapsed sim-months; the clock system advances it
-        treasury = C.ECON.START_TREASURY,          -- city funds; the economy moves this
+        clock = { months = 0 },                       -- elapsed sim-months; the clock system advances it
+        treasury = opts.start_treasury or C.ECON.START_TREASURY,
         economy = { last_net = 0 },                -- last month's net delta, for the HUD
         roads = { connected = {} },                -- Derived road-connectivity cache
         power = { topology = {}, powered = {} },   -- Derived power state, rebuilt from the grid on load

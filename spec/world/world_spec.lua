@@ -36,6 +36,16 @@ describe("World", function()
         assert.are.same({}, w.mission)
     end)
 
+    it("new(seed, opts) applies opts.start_treasury when given", function()
+        local w = World.new(1, { start_treasury = 5000 })
+        assert.are.equal(5000, w.treasury)
+    end)
+
+    it("new(seed) without opts uses the default start treasury", function()
+        local w = World.new(1)
+        assert.are.equal(C.ECON.START_TREASURY, w.treasury)
+    end)
+
     describe("charter", function()
         it("sets mission and crew atomically and publishes mission_chartered", function()
             local w = World.new(1)
