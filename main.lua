@@ -32,6 +32,7 @@ local Save = require("src.persistence.save")
 local Theme = require("src.ui.theme")
 local ScreenManager = require("src.ui.screen_manager")
 local Home = require("src.ui.screens.home")
+local PauseModal = require("src.ui.screens.pause_modal")
 
 local world, cam, runner
 local mgr
@@ -147,27 +148,58 @@ local function start_mission(seed)
     mgr:clear_current() -- in-game = no menu surface underneath
 end
 
+-- Load slot 1 into the live mission state and wire it up. Shared by the Home
+-- "Continue Operations" action and the Pause modal's "Load from Archive".
+-- Returns true on success so callers can decide whether to transition UI.
+local function load_into_mission()
+    local loaded = Save.load(1)
+    if not loaded then return false end
+    world = loaded
+    cam = Camera.new()
+    runner = Runner.new()
+    Runner.add(runner, Clock.system())
+    Runner.add(runner, Demand.system())
+    Runner.add(runner, Growth.system())
+    Runner.add(runner, Economy.system())
+    wire_world(world)
+    return true
+end
+
 -- Home action closures. Step 3 stubs for archive/settings (later steps wire
 -- real screens); continue/new_mission/end_transmission do their real work.
 local function home_actions()
     return {
         continue = function()
-            local loaded = Save.load(1)
-            if not loaded then return end -- silent no-op until step 7 surfaces a flash
-            world = loaded
-            cam = Camera.new()
-            runner = Runner.new()
-            Runner.add(runner, Clock.system())
-            Runner.add(runner, Demand.system())
-            Runner.add(runner, Growth.system())
-            Runner.add(runner, Economy.system())
-            wire_world(world)
+            if not load_into_mission() then return end -- silent no-op until step 7 surfaces a flash
             mgr.in_game = true
             mgr:clear_current()
         end,
         new_mission      = function() start_mission(os.time()) end,
         archive          = function() end, -- step 7
         settings         = function() end, -- step 8
+        end_transmission = function() love.event.quit() end,
+    }
+end
+
+-- Pause-modal action closures. Save stays on the modal (player can save without
+-- resuming); Load pops back to the now-loaded world; Mission Control is a stub
+-- until step 9 wires the crew dashboard. End Transmission quits regardless of
+-- save state (4c-2 adds the "save first?" prompt).
+local function pause_actions()
+    return {
+        resume = function()
+            mgr:pop_modal()
+        end,
+        save_to_archive = function()
+            Save.save(world, 1)
+            -- Stay on the modal so the player sees the menu after the action;
+            -- 4c-2 will surface a "Saved" flash in the modal frame.
+        end,
+        load_from_archive = function()
+            if not load_into_mission() then return end -- silent no-op for now
+            mgr:pop_modal()
+        end,
+        mission_control = function() end, -- step 9
         end_transmission = function() love.event.quit() end,
     }
 end
@@ -179,6 +211,7 @@ function love.load()
 
     mgr = ScreenManager.new()
     mgr:register("home", Home.new(home_actions()))
+    mgr:register("pause_modal", PauseModal.new(pause_actions()))
     mgr:set_current("home")
     -- in_game stays false: the app boots on the menu, not in a running mission.
 end
@@ -238,6 +271,14 @@ function love.keypressed(key)
     mgr:keypressed(key)
     if not in_game_active() then return end
 
+    -- Esc in-game opens the Pause modal. Once it's pushed, the next
+    -- keypressed (incl. another Esc) routes to the modal, not here.
+    if key == "escape" then
+        mgr:push_modal("pause_modal")
+        drag_start = nil -- cancel any in-progress drag on pause
+        return
+    end
+
     local tool = TOOL_KEYS[key]
     if tool then
         current_tool = tool
@@ -266,8 +307,6 @@ function love.keypressed(key)
             flash("No save")
         end
     end
-    -- Note: Esc-in-game quit went away with step 3. The Pause modal (step 4)
-    -- will subscribe to Esc here; until then Esc has no in-game binding.
 end
 
 -- Begin a road/zone drag: anchor on the tile under the cursor (in tile coords,
