@@ -4,7 +4,7 @@
 -- preset to actual sim tunables (starting funds + 1-2 more).
 
 return {
-    { key = "simulator",     label = "Simulator",     summary = "Practice run. Generous funding. Forgiving thresholds." },
-    { key = "first_mission", label = "1st Mission",   summary = "Default tuning. The mission you trained for." },
-    { key = "stellar",       label = "Stellar",       summary = "Lean charter. Tight constraints. For experienced operators." },
+    { key = "simulator",     label = "Simulator",   abbr = "SIM", summary = "Practice run. Generous funding. Forgiving thresholds." },
+    { key = "first_mission", label = "1st Mission", abbr = "1ST", summary = "Default tuning. The mission you trained for." },
+    { key = "stellar",       label = "Stellar",     abbr = "STL", summary = "Lean charter. Tight constraints. For experienced operators." },
 }
