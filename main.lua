@@ -35,6 +35,7 @@ local Home = require("src.ui.screens.home")
 local PauseModal = require("src.ui.screens.pause_modal")
 local NewMission = require("src.ui.screens.new_mission")
 local Archive = require("src.ui.screens.archive")
+local Settings = require("src.ui.screens.settings")
 local RNG = require("src.sim.rng")
 
 local world, cam, runner
@@ -293,7 +294,9 @@ local function home_actions()
             }))
             mgr:set_current("archive")
         end,
-        settings         = function() end, -- step 8
+        settings = function()
+            mgr:set_current("settings")
+        end,
         end_transmission = function() love.event.quit() end,
     }
 end
@@ -332,6 +335,7 @@ function love.load()
     mgr = ScreenManager.new()
     mgr:register("home", Home.new(home_actions()))
     mgr:register("pause_modal", PauseModal.new(pause_actions()))
+    mgr:register("settings", Settings.new({ back = function() mgr:set_current("home") end }))
     mgr:set_current("home")
     -- in_game stays false: the app boots on the menu, not in a running mission.
 end
