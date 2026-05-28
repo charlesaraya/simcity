@@ -71,6 +71,13 @@ function ScreenManager:pop_modal()
     self._stack[#self._stack] = nil
 end
 
+-- Tear the modal stack down to empty. Used by transitions that leave the
+-- mission entirely (Return to Home from Mission Control, End Transmission)
+-- where popping one-at-a-time is noisier than the actual semantic.
+function ScreenManager:clear_modals()
+    for i = #self._stack, 1, -1 do self._stack[i] = nil end
+end
+
 function ScreenManager:modal_count()
     return #self._stack
 end

@@ -36,6 +36,7 @@ local PauseModal = require("src.ui.screens.pause_modal")
 local NewMission = require("src.ui.screens.new_mission")
 local Archive = require("src.ui.screens.archive")
 local Settings = require("src.ui.screens.settings")
+local MissionControl = require("src.ui.screens.mission_control")
 local RNG = require("src.sim.rng")
 
 local world, cam, runner
@@ -322,7 +323,30 @@ local function pause_actions()
             if not load_into_mission() then return end -- silent no-op for now
             mgr:pop_modal()
         end,
-        mission_control = function() end, -- step 9
+        mission_control = function()
+            -- Replace the pause modal with Mission Control on the stack so the
+            -- sim stays paused (modal_count > 0) and Back can re-push pause.
+            mgr:pop_modal()
+            local cycle = math.floor(((world.clock and world.clock.months) or 0)
+                                     / C.SIM.MONTHS_PER_YEAR)
+            mgr:register("mission_control", MissionControl.new({
+                mission = world.mission or {},
+                crew = world.crew or {},
+                cycle = cycle,
+                actions = {
+                    back = function()
+                        mgr:pop_modal()
+                        mgr:push_modal("pause_modal")
+                    end,
+                    return_to_home = function()
+                        mgr:clear_modals()
+                        mgr.in_game = false
+                        mgr:set_current("home")
+                    end,
+                },
+            }))
+            mgr:push_modal("mission_control")
+        end,
         end_transmission = function() love.event.quit() end,
     }
 end
