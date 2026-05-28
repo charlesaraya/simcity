@@ -35,13 +35,29 @@ function World.new(seed)
         grid = Grid.new(),
         rng = RNG.new(seed),
         demand = { residential = 0, commercial = 0, industrial = 0 },
-        clock = { months = 0 },                  -- elapsed sim-months; the clock system advances it
-        treasury = C.ECON.START_TREASURY,        -- city funds; the economy moves this
-        economy = { last_net = 0 },              -- last month's net delta, for the HUD
-        roads = { connected = {} },              -- Derived road-connectivity cache
-        power = { topology = {}, powered = {} }, -- Derived power state, rebuilt from the grid on load
+        clock = { months = 0 },                    -- elapsed sim-months; the clock system advances it
+        treasury = C.ECON.START_TREASURY,          -- city funds; the economy moves this
+        economy = { last_net = 0 },                -- last month's net delta, for the HUD
+        roads = { connected = {} },                -- Derived road-connectivity cache
+        power = { topology = {}, powered = {} },   -- Derived power state, rebuilt from the grid on load
         pollution = { field = {}, dirty = false }, -- Derived diffusion field; lazily rebuilt from the grid
+        -- 4c-1 step 5: charter slots. Empty tables until World.charter
+        -- (called by the New Mission screen in step 6) populates them.
+        crew = {},    -- 1..5 specialists when chartered
+        mission = {}, -- mission name/difficulty/world params when chartered
     }
+end
+
+-- WRITE: charter a mission -- set world.mission and world.crew atomically and
+-- publish MISSION_CHARTERED. Subsequent calls REPLACE both (the charter screen
+-- may let the operator re-roll). No system reacts in 4c (the crew is flavor
+-- only); the writer publishes the event anyway so Phase 5+ mechanics can plug
+-- in without editing this function. (Principle 4: writers mutate AND publish.)
+function World.charter(world, mission, crew)
+    world.mission = mission
+    world.crew = crew
+    Bus.publish(C.EVENTS.MISSION_CHARTERED, { mission = mission, crew = crew })
+    return true
 end
 
 -- WRITE: designate a tile's zone. Idempotent: re-zoning is a no-op (no event);

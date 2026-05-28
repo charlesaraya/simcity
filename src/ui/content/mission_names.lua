@@ -1,0 +1,36 @@
+-- src/ui/content/mission_names.lua
+-- Curated pool of mission designations. Pattern: a celestial / mythological
+-- root + roman numeral suffix
+
+return {
+    "Janus-IV",
+    "Tethys-II",
+    "Ceres-VII",
+    "Orpheus-III",
+    "Atlas-IX",
+    "Hesperia-I",
+    "Vesta-V",
+    "Pyx-II",
+    "Carina-VI",
+    "Lyra-IV",
+    "Caelum-III",
+    "Norma-VIII",
+    "Erebus-I",
+    "Mensa-V",
+    "Hyperion-II",
+    "Argo-X",
+    "Phoebe-III",
+    "Cassiopeia-VII",
+    "Triton-IV",
+    "Sextans-II",
+    "Selene-VI",
+    "Halcyon-III",
+    "Apollo-XI",
+    "Mira-V",
+    "Pavo-IV",
+    "Theia-II",
+    "Nereid-I",
+    "Eunomia-VIII",
+    "Aurora-III",
+    "Themis-IX",
+}

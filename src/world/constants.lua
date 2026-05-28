@@ -240,6 +240,51 @@ C.EVENTS       = {
     PLANT_REMOVED        = "plant_removed",
     POWER_LINE_BUILT     = "power_line_built",
     POWER_LINE_REMOVED   = "power_line_removed",
+    -- Phase 4c-1: published by World.charter when New Mission populates
+    -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
+    -- only); Phase 5+ mechanics can subscribe without touching the writer.
+    MISSION_CHARTERED    = "mission_chartered",
+}
+
+-- Mission Team / Charter (Phase 4c-1 step 5)
+C.ROLE         = {
+    COMMANDER     = 1,
+    ENGINEER      = 2,
+    AGRONOMIST    = 3,
+    QUARTERMASTER = 4,
+    SCIENTIST     = 5,
+    MEDIC         = 6,
+}
+C.ROLE_LABEL   = {
+    [C.ROLE.COMMANDER]     = "Commander",
+    [C.ROLE.ENGINEER]      = "Engineer",
+    [C.ROLE.AGRONOMIST]    = "Agronomist",
+    [C.ROLE.QUARTERMASTER] = "Quartermaster",
+    [C.ROLE.SCIENTIST]     = "Scientist",
+    [C.ROLE.MEDIC]         = "Medic",
+}
+-- Default role assignment order
+-- Charter screens past 4c-1 may let the operator override per slot.
+C.ROLE_ORDER   = {
+    C.ROLE.COMMANDER,
+    C.ROLE.ENGINEER,
+    C.ROLE.AGRONOMIST,
+    C.ROLE.QUARTERMASTER,
+    C.ROLE.SCIENTIST,
+    C.ROLE.MEDIC,
+}
+
+-- Status enum starts narrow. PRD: opens room for "injured"/"transit" later;
+-- 4c only ever writes ACTIVE.
+C.STATUS       = {
+    ACTIVE = "active",
+}
+
+C.MISSION      = {
+    TEAM_SIZE_MIN      = 1,
+    TEAM_SIZE_MAX      = 5,
+    TEAM_SIZE_DEFAULT  = 3,
+    DEFAULT_DIFFICULTY = "first_mission", -- placeholder until 4c-2 wires presets
 }
 
 return C

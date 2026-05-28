@@ -30,6 +30,34 @@ describe("World", function()
         assert.are.same({}, w.roads.connected)
         assert.are.same({}, w.pollution.field)
         assert.is_false(w.pollution.dirty)
+        -- 4c-1 step 5: charter slots exist on a fresh world but are empty
+        -- until World.charter populates them.
+        assert.are.same({}, w.crew)
+        assert.are.same({}, w.mission)
+    end)
+
+    describe("charter", function()
+        it("sets mission and crew atomically and publishes mission_chartered", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.MISSION_CHARTERED)
+            local mission = { name = "Janus-IV", difficulty = "first_mission", started_at = 1234 }
+            local crew = {
+                { name = "Akemi Vance",   role = C.ROLE.COMMANDER, traits = { "Veteran" },    status = C.STATUS.ACTIVE },
+                { name = "Salim Okoro",   role = C.ROLE.ENGINEER,  traits = { "Methodical" }, status = C.STATUS.ACTIVE },
+            }
+            assert.is_true(World.charter(w, mission, crew))
+            assert.are.same(mission, w.mission)
+            assert.are.same(crew, w.crew)
+            assert.are.equal(1, spy.called)
+        end)
+
+        it("a subsequent charter REPLACES mission + crew (re-roll allowed in charter screen)", function()
+            local w = World.new(1)
+            World.charter(w, { name = "First" }, { { name = "A" } })
+            World.charter(w, { name = "Second" }, { { name = "B" }, { name = "C" } })
+            assert.are.equal("Second", w.mission.name)
+            assert.are.equal(2, #w.crew)
+        end)
     end)
 
     describe("zone_tile", function()
