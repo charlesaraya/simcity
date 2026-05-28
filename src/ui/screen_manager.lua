@@ -1,20 +1,16 @@
 -- src/ui/screen_manager.lua
 -- The screen state machine. Owns which menu screen is current, the modal stack
 -- (Pause modal pushes here from in-game), an `in_game` flag for the running
--- mission, and the dispatch order for love callbacks. Pure module, headless-
--- testable: it never touches love itself; screens are just tables of callbacks.
+-- mission, and the dispatch order for love callbacks.
 --
 -- Sim-tick gate: `should_tick()` is true iff in_game AND the modal stack is
--- empty — main reads this each frame to decide whether to call Runner.update.
--- Any open modal (or being on a menu) pauses the sim.
+-- empty: main reads this each frame to decide whether to call Runner.update.
+-- Any open modal, or being on a menu, pauses the sim.
 --
 -- Dispatch: input/update routes to the TOP active surface only — the topmost
 -- modal if any, else the current screen, else a no-op. Draw is layered: the
 -- current screen draws first, then every modal in stack order, so modals
--- visibly overlay the screen they were opened from. The iso world (when
--- in_game and no current screen) is drawn by main, NOT by the manager —
--- modals layer over that too because main draws iso first, then calls
--- manager:draw().
+-- visibly overlay the screen they were opened from.
 
 local ScreenManager = {}
 ScreenManager.__index = ScreenManager
@@ -53,6 +49,13 @@ end
 
 function ScreenManager:current_id()
     return self._current
+end
+
+-- Drop the current screen so dispatch falls through to the in-game handler in
+-- main. Called when entering a mission (in_game = true) so arrow keys / clicks
+-- aren't routed to whatever menu was last shown.
+function ScreenManager:clear_current()
+    self._current = nil
 end
 
 -- MODAL STACK ----------------------------------------------------------------
@@ -114,6 +117,10 @@ end
 
 function ScreenManager:mousereleased(x, y, button)
     call(active(self), "mousereleased", x, y, button)
+end
+
+function ScreenManager:mousemoved(x, y)
+    call(active(self), "mousemoved", x, y)
 end
 
 function ScreenManager:wheelmoved(dx, dy)

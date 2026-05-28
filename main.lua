@@ -1,10 +1,13 @@
 -- main.lua
--- LÖVE entry point and orchestration. It owns no game logic,
--- it wires the pieces together and routes LÖVE's callbacks to them:
---   setup:  bus + world + camera + runner (clock/demand/growth/economy) + zoning
---   update: pan camera, hold-to-paint, advance the sim by speed-scaled dt
---   draw:   hand the world to the renderer, then the debug HUD
---   input:  select tool (1/2/3/4), change speed, zoom
+-- LÖVE entry point and orchestration. Owns no game logic; wires the pieces
+-- together and routes LÖVE's callbacks to them:
+--   boot:    Theme + ScreenManager + Home; app starts on the menu, NOT in-game
+--   in-game: bus + world + camera + runner (clock/demand/growth/economy) + zoning
+--   update:  pan camera, hold-to-paint, advance the sim by speed-scaled dt — gated
+--            on mgr:should_tick() so menu/modal halts the sim
+--   draw:    iso world + HUD when in_game; ALWAYS overlay the menu/modal layer
+--   input:   in-game keys (tool, speed, save/load) run only when in_game AND no
+--            modal; menu screens consume input via the manager
 
 local C = require("src.world.constants")
 local World = require("src.world.world")
@@ -26,8 +29,12 @@ local Iso = require("src.render.iso")
 local Renderer = require("src.render.renderer")
 local Hud = require("src.ui.hud")
 local Save = require("src.persistence.save")
+local Theme = require("src.ui.theme")
+local ScreenManager = require("src.ui.screen_manager")
+local Home = require("src.ui.screens.home")
 
 local world, cam, runner
+local mgr
 local speed = C.SPEED.NORMAL
 local current_tool = C.TOOL.ZONE_RES
 local current_overlay = C.OVERLAY.NONE
@@ -123,62 +130,114 @@ local function current_drag(cx, cy)
     return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = valid }, Drag.zone_cost(world, tiles, zone)
 end
 
-function love.load()
-    love.graphics.setFont(love.graphics.newFont(15))
-    love.graphics.setBackgroundColor(C.COLOR.BG)
-
-    world = World.new(os.time()) -- seed varies per run
+-- Build a fresh mission from a seed: world, camera, runner, event wiring.
+-- Hoisted out of love.load so the Home actions ("New Mission", "Continue")
+-- can call it. Continue replaces the world post-construction via Save.load
+-- and re-wires; this helper only handles the fresh-mission path.
+local function start_mission(seed)
+    world = World.new(seed)
     cam = Camera.new()
-
     runner = Runner.new()
     Runner.add(runner, Clock.system())
     Runner.add(runner, Demand.system())
     Runner.add(runner, Growth.system())
     Runner.add(runner, Economy.system())
     wire_world(world)
+    mgr.in_game = true
+    mgr:clear_current() -- in-game = no menu surface underneath
+end
+
+-- Home action closures. Step 3 stubs for archive/settings (later steps wire
+-- real screens); continue/new_mission/end_transmission do their real work.
+local function home_actions()
+    return {
+        continue = function()
+            local loaded = Save.load(1)
+            if not loaded then return end -- silent no-op until step 7 surfaces a flash
+            world = loaded
+            cam = Camera.new()
+            runner = Runner.new()
+            Runner.add(runner, Clock.system())
+            Runner.add(runner, Demand.system())
+            Runner.add(runner, Growth.system())
+            Runner.add(runner, Economy.system())
+            wire_world(world)
+            mgr.in_game = true
+            mgr:clear_current()
+        end,
+        new_mission      = function() start_mission(os.time()) end,
+        archive          = function() end, -- step 7
+        settings         = function() end, -- step 8
+        end_transmission = function() love.event.quit() end,
+    }
+end
+
+function love.load()
+    love.graphics.setBackgroundColor(C.UI.bg)
+    Theme.init(love.graphics.newFont)
+    love.graphics.setFont(Theme.font("body"))
+
+    mgr = ScreenManager.new()
+    mgr:register("home", Home.new(home_actions()))
+    mgr:set_current("home")
+    -- in_game stays false: the app boots on the menu, not in a running mission.
 end
 
 function love.update(dt)
-    Camera.update(cam, dt) -- WASD pan
+    -- Camera pan (WASD) responds whenever a mission is loaded, even with a
+    -- modal open (PRD: pan/zoom continue to work behind the Pause modal).
+    if cam then Camera.update(cam, dt) end
 
-    -- Bulldoze paints on hold (tap = one, drag = many). Roads and zones instead
-    -- build on release via a drag preview (see mousepressed/mousereleased).
-    if current_tool == C.TOOL.BULLDOZE and love.mouse.isDown(1) then
-        local tx, ty = hovered_tile()
-        if tx then Tools.apply(C.TOOL.BULLDOZE, world, tx, ty) end
+    if mgr:should_tick() then
+        -- Bulldoze paints on hold (tap = one, drag = many). Roads and zones build
+        -- on release via a drag preview (see mousepressed/mousereleased).
+        if current_tool == C.TOOL.BULLDOZE and love.mouse.isDown(1) then
+            local tx, ty = hovered_tile()
+            if tx then Tools.apply(C.TOOL.BULLDOZE, world, tx, ty) end
+        end
+        -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
+        Runner.update(runner, dt * speed, world)
     end
 
-    -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
-    Runner.update(runner, dt * speed, world)
+    -- Keep pollution-derived caches current for the overlays even between
+    -- growth ticks: resolve is a no-op unless the field is dirty.
+    if mgr.in_game then Pollution.resolve(world) end
 
-    -- Keep the pollution-derived caches current for the overlays even between
-    -- growth ticks (or while paused): resolve is a no-op unless the field is
-    -- dirty, so this is a cheap dirty-check most frames.
-    Pollution.resolve(world)
+    mgr:update(dt)
 end
 
 function love.draw()
-    local tx, ty = hovered_tile()
-    local preview, drag_cost
-    if drag_start and tx then
-        preview, drag_cost = current_drag(tx, ty)
-    elseif current_tool == C.TOOL.PLANT and tx then
-        -- Plant is a single click, not a drag: preview its 2x2 footprint under the
-        -- cursor, red when blocked or unaffordable.
-        local valid = Drag.plant_footprint_valid(world, tx, ty) and Drag.plant_affordable(world)
-        preview = { tiles = Drag.plant_footprint(tx, ty), color = C.COLOR.PLANT, valid = valid }
-        drag_cost = Drag.plant_cost()
+    if mgr.in_game then
+        local tx, ty = hovered_tile()
+        local preview, drag_cost
+        if drag_start and tx then
+            preview, drag_cost = current_drag(tx, ty)
+        elseif current_tool == C.TOOL.PLANT and tx then
+            -- Plant is a single click, not a drag: preview its 2x2 footprint under
+            -- the cursor, red when blocked or unaffordable.
+            local valid = Drag.plant_footprint_valid(world, tx, ty) and Drag.plant_affordable(world)
+            preview = { tiles = Drag.plant_footprint(tx, ty), color = C.COLOR.PLANT, valid = valid }
+            drag_cost = Drag.plant_cost()
+        end
+        Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
+        local msg = (love.timer.getTime() < status_until) and status_msg or nil
+        Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost, overlay = current_overlay })
     end
-    Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
-    local msg = (love.timer.getTime() < status_until) and status_msg or nil
-    Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost, overlay = current_overlay })
+    -- Menu screens + modals draw on top (layered overlay).
+    mgr:draw()
+end
+
+-- Helper: are we live in-game with no modal in the way? Tools/speed/save keys
+-- and mouse-driven build only run when this is true.
+local function in_game_active()
+    return mgr.in_game and mgr:modal_count() == 0
 end
 
 function love.keypressed(key)
-    if key == "escape" then
-        love.event.quit()
-        return
-    end
+    -- Menu/modal first; they consume input when active.
+    mgr:keypressed(key)
+    if not in_game_active() then return end
+
     local tool = TOOL_KEYS[key]
     if tool then
         current_tool = tool
@@ -207,11 +266,15 @@ function love.keypressed(key)
             flash("No save")
         end
     end
+    -- Note: Esc-in-game quit went away with step 3. The Pause modal (step 4)
+    -- will subscribe to Esc here; until then Esc has no in-game binding.
 end
 
 -- Begin a road/zone drag: anchor on the tile under the cursor (in tile coords,
 -- so panning mid-drag doesn't move the anchor). Bulldoze isn't a drag tool.
-function love.mousepressed(_x, _y, button)
+function love.mousepressed(x, y, button)
+    mgr:mousepressed(x, y, button)
+    if not in_game_active() then return end
     if button ~= 1 then return end
     local tx, ty = hovered_tile()
     if not tx then return end
@@ -225,7 +288,9 @@ end
 
 -- Commit the drag on release. apply_run/apply_rect are all-or-nothing and
 -- self-validating, so an invalid/unaffordable drag is a safe no-op.
-function love.mousereleased(_x, _y, button)
+function love.mousereleased(x, y, button)
+    mgr:mousereleased(x, y, button)
+    if not in_game_active() then return end
     if button ~= 1 or not drag_start then return end
     local cx, cy = hovered_tile()
     if cx then
@@ -240,7 +305,17 @@ function love.mousereleased(_x, _y, button)
     drag_start = nil
 end
 
+-- Hover routing for menu screens (Home highlights the row under the cursor).
+-- In-game has no hover-driven state, so this is menu-only.
+function love.mousemoved(x, y)
+    mgr:mousemoved(x, y)
+end
+
 -- Wheel notches drive cursor-anchored zoom (two-finger trackpad scroll).
-function love.wheelmoved(_dx, dy)
-    Camera.zoom(cam, dy, love.mouse.getPosition())
+function love.wheelmoved(dx, dy)
+    mgr:wheelmoved(dx, dy)
+    if cam and mgr.in_game then
+        -- Zoom continues to respond behind a modal, mirroring camera pan.
+        Camera.zoom(cam, dy, love.mouse.getPosition())
+    end
 end
