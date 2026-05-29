@@ -38,6 +38,7 @@ local NewMission = require("src.ui.screens.new_mission")
 local Archive = require("src.ui.screens.archive")
 local Settings = require("src.ui.screens.settings")
 local MissionControl = require("src.ui.screens.mission_control")
+local ConfirmModal = require("src.ui.screens.confirm_modal")
 local RNG = require("src.sim.rng")
 
 local world, cam, runner
@@ -54,6 +55,14 @@ local current_slug = nil
 -- Real seconds the player has spent in this mission with the sim ticking.
 -- Stamped into meta.time_played on save; restored on load.
 local mission_elapsed = 0
+
+-- Has the in-memory mission diverged from disk since the last persist()?
+-- Set true on charter, in-game input, and every sim tick. Cleared by
+-- persist(). The save-before-abandoning guard (Phase 4c-2 step 3) reads it
+-- to decide whether to push a confirmation modal before End Transmission
+-- or Return to Home.
+local unsaved_changes = false
+local function mark_dirty() unsaved_changes = true end
 
 -- Overlay cycle order for the [O] key: off -> pollution -> land value -> power -> off.
 local OVERLAY_CYCLE = {
@@ -107,10 +116,14 @@ end
 local function wire_world(w)
     Bus.clear()
     Zoning.install(w)
-    Roads.install(w)   -- recomputes the road-connectivity cache from the grid (on load too)
-    Power.install(w)   -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
-    Pollution.install(w) -- subscribes source events (sets dirty); seeds the field from the grid
-    Economy.install(w) -- subscribes the one-time road/line/plant debits
+    Roads.install(w)       -- recomputes the road-connectivity cache from the grid (on load too)
+    Power.install(w)       -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
+    Pollution.install(w)   -- subscribes source events (sets dirty); seeds the field from the grid
+    Economy.install(w)     -- subscribes the one-time road/line/plant debits
+    -- 4c-2 step 3: a month boundary is a meaningful unit of progress.
+    -- mark_dirty here keeps the save-before-abandoning prompt sensitive to
+    -- "did the city advance since last save" without firing every frame.
+    Bus.subscribe(C.EVENTS.MONTH_ELAPSED, function() mark_dirty() end)
 end
 
 -- Mouse position -> tile under the cursor, or nil if off-grid. Shared by the
@@ -170,10 +183,12 @@ local function build_meta()
 end
 
 -- Write both the world and its sidecar. The pair always stays in sync --
--- one isn't useful without the other.
+-- one isn't useful without the other. Clears the unsaved-changes flag so the
+-- abandon guard knows the next ask is allowed to skip the prompt.
 local function persist()
     Save.save(world, current_slug)
     Meta.save(current_slug, build_meta())
+    unsaved_changes = false
 end
 
 -- Install a world (fresh or loaded) as the live mission: bind it to the
@@ -195,11 +210,12 @@ end
 -- Build a fresh mission from a seed and enter in-game. opts are forwarded to
 -- World.new (4c-2: difficulty overrides like start_treasury). current_slug
 -- is left nil; the charter action mints one once the player has named the
--- mission.
+-- mission. The new mission is dirty by definition (nothing on disk yet).
 local function start_mission(seed, opts)
     install_world(World.new(seed, opts))
     current_slug = nil
     mission_elapsed = 0
+    unsaved_changes = true
     mgr.in_game = true
     mgr:clear_current()
 end
@@ -251,6 +267,32 @@ local function archive_actions()
             mgr:clear_current()
         end,
     }
+end
+
+-- If the live mission has unsaved changes, push a confirm modal that lets
+-- the player save / discard / cancel before continuing with `then_fn`. When
+-- already clean, jumps straight to then_fn.
+local function guard_abandon(title, body, then_fn)
+    if not unsaved_changes then return then_fn() end
+    mgr:register("confirm_modal", ConfirmModal.new({
+        title = title,
+        body = body,
+        actions = {
+            yes = function()
+                persist()
+                mgr:pop_modal()
+                then_fn()
+            end,
+            no = function()
+                mgr:pop_modal()
+                then_fn()
+            end,
+            cancel = function()
+                mgr:pop_modal()
+            end,
+        },
+    }))
+    mgr:push_modal("confirm_modal")
 end
 
 -- Resolve a difficulty key to its `overrides` table (start_treasury, ...).
@@ -329,10 +371,12 @@ local function pause_actions()
             mgr:pop_modal()
         end,
         save_to_archive = function()
-            -- Write the live mission's world AND its meta sidecar. current_slug
-            -- is set at charter / continue / archive-load.
+            -- Write the live mission's world AND its meta sidecar, then close
+            -- the modal so the HUD's "Saved" flash is visible (the modal
+            -- backdrop hides the HUD while open).
             persist()
-            -- Stay on the modal so the player sees the menu after the action.
+            flash("Saved")
+            mgr:pop_modal()
         end,
         load_from_archive = function()
             if not load_into_mission() then return end -- silent no-op for now
@@ -354,15 +398,25 @@ local function pause_actions()
                         mgr:push_modal("pause_modal")
                     end,
                     return_to_home = function()
-                        mgr:clear_modals()
-                        mgr.in_game = false
-                        mgr:set_current("home")
+                        guard_abandon(
+                            "Save before returning to Home?",
+                            "Unsaved progress on this mission will be lost.",
+                            function()
+                                mgr:clear_modals()
+                                mgr.in_game = false
+                                mgr:set_current("home")
+                            end)
                     end,
                 },
             }))
             mgr:push_modal("mission_control")
         end,
-        end_transmission = function() love.event.quit() end,
+        end_transmission = function()
+            guard_abandon(
+                "Save before transmission ends?",
+                "Unsaved progress on this mission will be lost.",
+                function() love.event.quit() end)
+        end,
     }
 end
 
@@ -393,7 +447,7 @@ function love.update(dt)
         -- on release via a drag preview (see mousepressed/mousereleased).
         if current_tool == C.TOOL.BULLDOZE and love.mouse.isDown(1) then
             local tx, ty = hovered_tile()
-            if tx then Tools.apply(C.TOOL.BULLDOZE, world, tx, ty) end
+            if tx then Tools.apply(C.TOOL.BULLDOZE, world, tx, ty); mark_dirty() end
         end
         -- Advance the simulation by speed-scaled time. speed 0 (paused) feeds 0.
         Runner.update(runner, dt * speed, world)
@@ -401,6 +455,9 @@ function love.update(dt)
         -- (matches PRD's "Played" column on the Archive). Paused / menu time
         -- doesn't count.
         mission_elapsed = mission_elapsed + dt
+        -- Per-frame mark_dirty was too aggressive: a save followed by a
+        -- single tick re-dirtied immediately. The MONTH_ELAPSED subscription
+        -- in wire_world flips dirty at month boundaries instead.
     end
 
     -- Keep pollution-derived caches current for the overlays even between
@@ -502,6 +559,7 @@ function love.mousepressed(x, y, button)
     -- Plant places on a single click (not a drag), all-or-nothing and self-gating.
     if current_tool == C.TOOL.PLANT then
         Tools.apply_plant(world, tx, ty)
+        mark_dirty()
         return
     end
     if is_drag_tool(current_tool) then drag_start = { x = tx, y = ty } end
@@ -523,6 +581,7 @@ function love.mousereleased(x, y, button)
         else
             Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
         end
+        mark_dirty()
     end
     drag_start = nil
 end
