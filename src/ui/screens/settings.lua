@@ -40,20 +40,21 @@ local PANEL_H     = 280
 function Settings:draw()
     local W = love.graphics.getWidth()
 
-    -- Title strip
-    love.graphics.setFont(Theme.font("heading"))
-    love.graphics.setColor(Theme.color("amber"))
-    love.graphics.print("▶", TITLE_X, TITLE_Y)
-    love.graphics.setColor(Theme.color("fg"))
-    love.graphics.print(TITLE, TITLE_X + 24, TITLE_Y)
-    love.graphics.setFont(Theme.font("meta"))
-    love.graphics.setColor(Theme.color("dim_fg"))
-    love.graphics.print(SUBTITLE, TITLE_X + 24, TITLE_Y + 22)
-
-    -- Framed panel with the placeholder line centered.
+    -- Panel geometry first so title can anchor to the panel's left edge.
     local pw = math.min(W * 0.6, 720)
     local px = (W - pw) * 0.5
     local py = PANEL_TOP_Y
+
+    -- Title strip — left-aligned to the panel (shared positioning rule).
+    love.graphics.setFont(Theme.font("heading"))
+    love.graphics.setColor(Theme.color("amber"))
+    love.graphics.print("▶", px, TITLE_Y)
+    love.graphics.setColor(Theme.color("fg"))
+    love.graphics.print(TITLE, px + 24, TITLE_Y)
+    love.graphics.setFont(Theme.font("meta"))
+    love.graphics.setColor(Theme.color("dim_fg"))
+    love.graphics.print(SUBTITLE, px + 24, TITLE_Y + 22)
+
     Widgets.frame(px, py, pw, PANEL_H)
 
     love.graphics.setFont(Theme.font("body"))

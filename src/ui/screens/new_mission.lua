@@ -541,18 +541,18 @@ function NewMission:draw()
     local L = compute_layout(W, H)
     self._layout = L -- cache for mouse hit-tests
 
-    -- Title strip: ▶ NEW MISSION  with dim subtitle below.
+    -- Title strip — left-aligned to the panel (shared positioning rule).
     love.graphics.setFont(Theme.font("heading"))
     love.graphics.setColor(Theme.color("amber"))
-    love.graphics.print("▶", TITLE_X, TITLE_Y)
+    love.graphics.print("▶", L.panel.x, TITLE_Y)
     love.graphics.setColor(Theme.color("fg"))
-    love.graphics.print("NEW MISSION", TITLE_X + 24, TITLE_Y)
+    love.graphics.print("NEW MISSION", L.panel.x + 24, TITLE_Y)
     love.graphics.setFont(Theme.font("meta"))
     love.graphics.setColor(Theme.color("dim_fg"))
-    love.graphics.print("-- CHARTER IDENTITY --", TITLE_X + 24, TITLE_Y + 28)
+    love.graphics.print("-- CHARTER IDENTITY --", L.panel.x + 24, TITLE_Y + 22)
 
     -- Outer panel
-    Widgets.frame(L.panel.x, L.panel.y, L.panel.w, L.panel.h)
+    Widgets.ceremonial_frame(L.panel.x, L.panel.y, L.panel.w, L.panel.h)
     local cx = L.content.cx
     local content_w = L.content.content_w
     local field_w = L.content.field_w

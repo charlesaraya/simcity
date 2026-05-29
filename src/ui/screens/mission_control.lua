@@ -92,19 +92,21 @@ function MissionControl:draw()
     love.graphics.setColor(Theme.color("bg"))
     love.graphics.rectangle("fill", 0, 0, W, H)
 
-    -- Title strip
-    love.graphics.setFont(Theme.font("heading"))
-    love.graphics.setColor(Theme.color("amber"))
-    love.graphics.print("▶", TITLE_X, TITLE_Y)
-    love.graphics.setColor(Theme.color("fg"))
-    love.graphics.print(TITLE, TITLE_X + 24, TITLE_Y)
-    love.graphics.setFont(Theme.font("meta"))
-    love.graphics.setColor(Theme.color("dim_fg"))
-    love.graphics.print(SUBTITLE, TITLE_X + 24, TITLE_Y + 22)
-
-    -- Mission identity strip: small outlined panel with name + cycle + difficulty.
+    -- Panel geometry first so title can anchor to the panel's left edge.
     local pw = math.min(W * 0.86, 1100)
     local px = (W - pw) * 0.5
+
+    -- Title strip — left-aligned to the panel (shared positioning rule).
+    love.graphics.setFont(Theme.font("heading"))
+    love.graphics.setColor(Theme.color("amber"))
+    love.graphics.print("▶", px, TITLE_Y)
+    love.graphics.setColor(Theme.color("fg"))
+    love.graphics.print(TITLE, px + 24, TITLE_Y)
+    love.graphics.setFont(Theme.font("meta"))
+    love.graphics.setColor(Theme.color("dim_fg"))
+    love.graphics.print(SUBTITLE, px + 24, TITLE_Y + 22)
+
+    -- Mission identity strip: small outlined panel with name + cycle + difficulty.
     love.graphics.setColor(Theme.color("bg"))
     love.graphics.rectangle("fill", px, IDENTITY_TOP, pw, IDENTITY_H)
     Widgets.outline(px, IDENTITY_TOP, pw, IDENTITY_H)

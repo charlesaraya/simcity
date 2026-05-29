@@ -20,11 +20,12 @@
 local Home   = {}
 Home.__index = Home
 
--- Layout: the menu sits inside an outlined panel sized to its content (height
--- == N rows + padding) and roughly half the window wide, centered horizontally
--- in the draw. The y-anchored constants stay module-level so the pure
--- row_at / row_center hit-test stays headless-testable (no love calls).
-local PANEL_TOP_Y = 140
+-- Layout: ceremonial title strip above the menu panel. The panel itself is
+-- sized to content (N rows + padding) and roughly half the window wide.
+-- y-anchored constants stay module-level so the pure row_at / row_center
+-- hit-test stays headless-testable (no love calls).
+local TITLE_BLOCK_H = 100 -- vertical space reserved above the panel
+local PANEL_TOP_Y = 80 + TITLE_BLOCK_H -- = 180
 local PANEL_PAD   = 24
 local ROW_H       = 60
 local ROWS_TOP_Y  = PANEL_TOP_Y + PANEL_PAD
@@ -135,7 +136,25 @@ function Home:draw()
     local px = (W - pw) * 0.5
     local py = PANEL_TOP_Y
     local ph = #self.options * ROW_H + PANEL_PAD * 2
-    Widgets.frame(px, py, pw, ph)
+
+    -- Ceremonial title block above the panel, anchored to the panel's left
+    -- edge (matches the title positioning on New Mission / Archive / Mission
+    -- Control / Settings — same x, same y across the menu surfaces).
+    love.graphics.setFont(Theme.font("heading"))
+    love.graphics.setColor(Theme.color("amber"))
+    love.graphics.print("▶", px, 36)
+    love.graphics.setColor(Theme.color("fg"))
+    love.graphics.print("SLOW GRID", px + 24, 36)
+    love.graphics.setFont(Theme.font("meta"))
+    love.graphics.setColor(Theme.color("gold"))
+    love.graphics.print("-- GROUND CONTROL · MISSION SHELL --", px + 24, 36 + 22)
+
+    -- Double rule beneath the subtitle, spanning the panel width.
+    Widgets.double_hr(px, py - 22, px + pw)
+
+    -- Ceremonial frame around the option panel (triple-line border + gold
+    -- corner brackets).
+    Widgets.ceremonial_frame(px, py, pw, ph)
 
     -- Row geometry inside the panel.
     local row_x = px + PANEL_PAD

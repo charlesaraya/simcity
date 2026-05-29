@@ -23,6 +23,45 @@ function Widgets.frame(x, y, w, h, color)
     love.graphics.rectangle("line", x + 3, y + 3, w - 6, h - 6)
 end
 
+-- A heavier ceremonial frame: triple-line border with gold corner brackets.
+-- Used on the institution-facing surfaces (Title / Home, Archive) so they
+-- read as more formal than the working screens. Pure draw, no state.
+function Widgets.ceremonial_frame(x, y, w, h)
+    local dim = Theme.color("dim_fg")
+    local gold = Theme.color("gold")
+    love.graphics.setColor(dim)
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", x, y, w, h)
+    love.graphics.rectangle("line", x + 3, y + 3, w - 6, h - 6)
+    love.graphics.rectangle("line", x + 6, y + 6, w - 12, h - 12)
+    -- Gold corner brackets: small L-shapes at each corner of the outer rule.
+    love.graphics.setColor(gold)
+    love.graphics.setLineWidth(2)
+    local b = 14 -- bracket arm length
+    -- top-left
+    love.graphics.line(x, y, x + b, y)
+    love.graphics.line(x, y, x, y + b)
+    -- top-right
+    love.graphics.line(x + w - b, y, x + w, y)
+    love.graphics.line(x + w, y, x + w, y + b)
+    -- bottom-left
+    love.graphics.line(x, y + h - b, x, y + h)
+    love.graphics.line(x, y + h, x + b, y + h)
+    -- bottom-right
+    love.graphics.line(x + w - b, y + h, x + w, y + h)
+    love.graphics.line(x + w, y + h - b, x + w, y + h)
+    love.graphics.setLineWidth(1)
+end
+
+-- A double horizontal rule. Two parallel lines with a small gap; used as a
+-- ceremonial separator under titles on Home / Archive.
+function Widgets.double_hr(x1, y, x2, color)
+    love.graphics.setColor(color or Theme.color("dim_fg"))
+    love.graphics.setLineWidth(1)
+    love.graphics.line(x1, y, x2, y)
+    love.graphics.line(x1, y + 3, x2, y + 3)
+end
+
 -- A simple outlined rectangle: name box, segmented cells, inactive buttons.
 function Widgets.outline(x, y, w, h, color)
     love.graphics.setColor(color or Theme.color("dim_fg"))

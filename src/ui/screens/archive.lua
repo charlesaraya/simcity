@@ -212,24 +212,28 @@ end
 function Archive:draw()
     local W = love.graphics.getWidth()
 
-    -- Title strip
-    love.graphics.setFont(Theme.font("heading"))
-    love.graphics.setColor(Theme.color("amber"))
-    love.graphics.print("▶", TITLE_X, TITLE_Y)
-    love.graphics.setColor(Theme.color("fg"))
-    love.graphics.print(TITLE, TITLE_X + 24, TITLE_Y)
-    love.graphics.setFont(Theme.font("meta"))
-    love.graphics.setColor(Theme.color("dim_fg"))
-    local n = #self.slots
-    local subtitle = ("-- MISSION RECORDS · %d %s --"):format(n, n == 1 and "RECORD" or "RECORDS")
-    love.graphics.print(subtitle, TITLE_X + 24, TITLE_Y + 22)
-
-    -- Main panel (fixed height regardless of slot count)
+    -- Main panel geometry computed first so the title strip can anchor to its
+    -- left edge instead of drifting off into the window margin.
     local pw = math.min(W * 0.86, 1100)
     local px = (W - pw) * 0.5
     local py = PANEL_TOP_Y
     local ph = PANEL_PAD * 2 + HEADER_H + VISIBLE_ROWS * ROW_H
-    Widgets.frame(px, py, pw, ph)
+
+    -- Title strip — left-aligned to the panel.
+    love.graphics.setFont(Theme.font("heading"))
+    love.graphics.setColor(Theme.color("amber"))
+    love.graphics.print("▶", px, TITLE_Y)
+    love.graphics.setColor(Theme.color("fg"))
+    love.graphics.print(TITLE, px + 24, TITLE_Y)
+    love.graphics.setFont(Theme.font("meta"))
+    love.graphics.setColor(Theme.color("dim_fg"))
+    local n = #self.slots
+    local subtitle = ("-- MISSION RECORDS · %d %s --"):format(n, n == 1 and "RECORD" or "RECORDS")
+    love.graphics.print(subtitle, px + 24, TITLE_Y + 22)
+
+    -- Archive panel: institution-facing surface (PRD ceremonial register),
+    -- so the heavier triple-line frame + gold corner brackets.
+    Widgets.ceremonial_frame(px, py, pw, ph)
 
     local row_x = px + PANEL_PAD
     local row_w = pw - PANEL_PAD * 2
@@ -271,18 +275,27 @@ function Archive:draw()
                 Widgets.scanline_fill(row_x, ry, row_w, row_inner_h)
                 love.graphics.setColor(Theme.color("bg"))
                 love.graphics.print(MARKER, row_x + 8, text_y)
-            else
-                love.graphics.setColor(Theme.color("fg"))
             end
 
             local num = ("%02d"):format(slot.slot or i)
+            -- Gold mission code in the # column reads as a ceremonial slot
+            -- identifier (institution-facing accent).
+            if not selected then
+                love.graphics.setColor(Theme.color("gold"))
+                love.graphics.print(num, row_x + COLS.NUM, text_y)
+                love.graphics.setColor(Theme.color("fg"))
+            end
             local name = string.upper(slot.mission_name or "UNTITLED")
             local cycle = ("%04d"):format(slot.cycle or 0)
             local pop = tostring(slot.population or 0)
             local treasury = fmt_money(slot.treasury)
             local diff = difficulty_abbr(slot.difficulty)
 
-            love.graphics.print(num,      row_x + COLS.NUM,                 text_y)
+            -- num drawn above in gold for unselected; selected rows print it
+            -- in bg-color along with everything else.
+            if selected then
+                love.graphics.print(num, row_x + COLS.NUM, text_y)
+            end
             love.graphics.print(name,     row_x + COLS.NAME,                text_y)
             love.graphics.print(cycle,    col_x(row_x, row_w, "CYCLE"),     text_y)
             love.graphics.print(pop,      col_x(row_x, row_w, "POP"),       text_y)
