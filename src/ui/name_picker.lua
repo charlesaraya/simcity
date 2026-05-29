@@ -32,7 +32,12 @@ end
 -- Draw `count` distinct entries from `pool`. Bounded-loop reservoir: pick an
 -- index, retry on collision -- fine because count is small (<=5) and the
 -- crew_names pool is ~30 long, so collision odds stay tiny.
+-- Hard assert keeps the retry loop bounded: if count ever exceeds pool size,
+-- the loop would spin forever. The current C.MISSION.TEAM_SIZE_MAX = 5 is
+-- well below the pool sizes, but this guards against a future bump.
 local function pick_distinct(rng, pool, count)
+    assert(count <= #pool,
+        "pick_distinct: count > pool size would loop forever")
     local taken = {}
     local out = {}
     for i = 1, count do

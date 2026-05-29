@@ -50,7 +50,6 @@ local difficulties = require("src.ui.content.difficulties")
 
 local TITLE         = "MISSION CONTROL"
 local SUBTITLE      = "-- COMMAND DECK --"
-local TITLE_X       = 56
 local TITLE_Y       = 36
 local IDENTITY_TOP  = 100
 local IDENTITY_H    = 64
@@ -77,9 +76,7 @@ local COLS = {
 }
 
 local function col_x(row_x, row_w, key)
-    local v = COLS[key]
-    if v < 1 then return row_x + math.floor(row_w * v) end
-    return row_x + v
+    return Widgets.col_x(COLS, row_x, row_w, key)
 end
 
 function MissionControl:draw()

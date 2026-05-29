@@ -67,8 +67,11 @@ function Save.migrate_legacy()
                     population = 0, -- legacy saves get a 0 placeholder; first
                                     -- F5 after load will recompute.
                 }))
+                -- Only remove the legacy flat file after a successful migration.
+                -- A corrupt save stays on disk so the player can investigate
+                -- instead of being silently wiped.
+                love.filesystem.remove(legacy)
             end
-            love.filesystem.remove(legacy)
         end
     end
 end

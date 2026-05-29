@@ -118,8 +118,18 @@ function Meta.unique_slug(base)
     return slug
 end
 
--- LÖVE-only: remove a saved mission's directory.
+-- A valid slug is one our slugify ever produces: lowercase alphanumeric +
+-- hyphens, nonempty. Guards Meta.delete against being called with a string
+-- containing path traversal characters (`..`, `/`). LÖVE's filesystem is
+-- already sandboxed to the save dir, but the guard pre-empts any future
+-- delete-UI from being subverted by a hand-edited save-dir entry name.
+local function valid_slug(slug)
+    return type(slug) == "string" and slug:match("^[a-z0-9%-]+$") ~= nil
+end
+
+-- LÖVE-only: remove a saved mission's directory. Rejects an invalid slug.
 function Meta.delete(slug)
+    if not valid_slug(slug) then return false end
     local dir = Meta.dir(slug)
     if not love.filesystem.getInfo(dir) then return end
     love.filesystem.remove(Meta.meta_path(slug))

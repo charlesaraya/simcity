@@ -232,7 +232,6 @@ local Theme            = require("src.ui.theme")
 local Widgets          = require("src.ui.widgets")
 
 -- Layout constants.
-local TITLE_X          = 56
 local TITLE_Y          = 36
 local PANEL_MARGIN_X   = 48
 local PANEL_TOP_Y      = 100

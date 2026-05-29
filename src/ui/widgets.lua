@@ -81,6 +81,15 @@ function Widgets.scanline_fill(x, y, w, h, color)
     end
 end
 
+-- Map a column key to a screen-x inside a row, given (row_x, row_w) and a
+-- COLS table where values < 1 are width-ratios and values >= 1 are absolute
+-- pixel offsets from row_x. Shared by archive + mission_control tables.
+function Widgets.col_x(cols, row_x, row_w, key)
+    local v = cols[key]
+    if v < 1 then return row_x + math.floor(row_w * v) end
+    return row_x + v
+end
+
 -- A dashed horizontal rule (separator).
 function Widgets.dashed_hr(x1, y, x2, color)
     love.graphics.setColor(color or Theme.color("dim_fg"))

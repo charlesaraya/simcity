@@ -31,7 +31,6 @@ local Widgets = require("src.ui.widgets")
 local TITLE       = "OPERATOR SETTINGS"
 local SUBTITLE    = "-- INSTRUMENT CALIBRATION --"
 local PLACEHOLDER = "-- AWAITING SUBSEQUENT UPDATE --"
-local TITLE_X     = 56
 local TITLE_Y     = 36
 local PANEL_TOP_Y = 140
 local PANEL_PAD   = 24

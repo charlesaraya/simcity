@@ -182,13 +182,15 @@ local function build_meta()
     })
 end
 
--- Write both the world and its sidecar. The pair always stays in sync --
--- one isn't useful without the other. Clears the unsaved-changes flag so the
--- abandon guard knows the next ask is allowed to skip the prompt.
+-- Write both the world and its sidecar. The pair must stay in sync, so the
+-- unsaved-changes flag is only cleared when BOTH writes succeed. A half-write
+-- (e.g. disk full mid-pair) leaves dirty=true so the abandon guard will still
+-- prompt on the next attempt to leave.
 local function persist()
-    Save.save(world, current_slug)
-    Meta.save(current_slug, build_meta())
-    unsaved_changes = false
+    local world_ok = Save.save(world, current_slug)
+    local meta_ok  = Meta.save(current_slug, build_meta())
+    if world_ok and meta_ok then unsaved_changes = false end
+    return world_ok and meta_ok
 end
 
 -- Install a world (fresh or loaded) as the live mission: bind it to the
