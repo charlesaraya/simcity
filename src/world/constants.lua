@@ -13,7 +13,9 @@ C.GRID_H       = 64
 
 -- Tile types. Plain integers (cheap to store/compare/serialize).
 C.TILE         = {
-    GRASS = 1,
+    GRASS        = 1,
+    IRON_DEPOSIT = 2, -- mineable terrain; Iron Mine can only be placed here
+    RAIL         = 3, -- freight rail track (Phase 5 step 4)
 }
 
 -- Menu-screen palette: "archaic-future / dossier-formal" (Foundation/Dune).
@@ -49,6 +51,10 @@ C.COLOR        = {
     BUILD_PENDING   = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
 
     ROAD            = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
+
+    -- Iron deposit terrain.
+    IRON_DEPOSIT_A  = { 0.54, 0.36, 0.20 }, -- warm rust-brown
+    IRON_DEPOSIT_B  = { 0.48, 0.31, 0.16 }, -- darker rust-brown (checker B)
 
     -- Power network.
     POWER_LINE      = { 0.55, 0.60, 0.78 }, -- steel-blue cable
@@ -225,6 +231,23 @@ C.RAMP         = {
     POLLUTION  = { { 0.25, 0.65, 0.30 }, { 0.90, 0.80, 0.25 }, { 0.80, 0.25, 0.20 } },
     LAND_VALUE = { { 0.80, 0.25, 0.20 }, { 0.90, 0.80, 0.25 }, { 0.25, 0.65, 0.30 } },
     POWER      = { served = { 0.25, 0.65, 0.30 }, unserved = { 0.80, 0.25, 0.20 } },
+}
+
+-- Typed goods flowing through logistics networks (Phase 5).
+-- Values are plain integers so they can key tables directly.
+C.GOODS        = {
+    RAW_MATERIALS   = 1,
+    PROCESSED_GOODS = 2,
+}
+
+-- Iron-deposit seeding at world-gen.
+-- EDGE_PAD:     min tiles from the map edge the deposit centre may land.
+-- CORNER_REACH: max tiles from the corner (bounds the deposit to a corner quadrant).
+-- CLUSTER:      number of tiles in the deposit cluster.
+C.DEPOSIT      = {
+    EDGE_PAD     = 3,
+    CORNER_REACH = 14,
+    CLUSTER      = 6,
 }
 
 -- Event names published by world-state writers (Principle 4).

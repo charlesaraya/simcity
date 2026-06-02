@@ -8,9 +8,9 @@
 -- are never called directly.
 
 local Grid = require("src.world.grid")
-local RNG = require("src.sim.rng")
-local Bus = require("src.bus")
-local C = require("src.world.constants")
+local RNG  = require("src.sim.rng")
+local Bus  = require("src.bus")
+local C    = require("src.world.constants")
 
 local World = {}
 
@@ -27,28 +27,61 @@ local function is_buildable(tile)
         and tile.zone == C.ZONE.NONE
 end
 
--- Build a new world. The grid is all grass; the RNG is seeded so growth is
+-- Place a cluster of IRON_DEPOSIT tiles in a random corner quadrant.
+-- Called once by World.new(); never called again (deposits are permanent terrain).
+-- The corner is chosen via the world RNG so placement is seed-deterministic.
+local function seed_deposits(world)
+    local g    = world.grid
+    local rng  = world.rng
+    local w, h = g.width, g.height
+    local pad  = C.DEPOSIT.EDGE_PAD
+    local reach = C.DEPOSIT.CORNER_REACH
+
+    -- Pick one of the four corners: sign pair drives direction from that corner.
+    local corners = { { 1, 1 }, { -1, 1 }, { 1, -1 }, { -1, -1 } }
+    local s  = corners[math.floor(RNG.random(rng) * 4) + 1]
+    local ox = s[1] > 0 and 1 or w
+    local oy = s[2] > 0 and 1 or h
+
+    local function rng_range(lo, hi)
+        return lo + math.floor(RNG.random(rng) * (hi - lo + 1))
+    end
+    local cx = ox + s[1] * rng_range(pad, reach)
+    local cy = oy + s[2] * rng_range(pad, reach)
+
+    -- Six-tile cross cluster; skip any tile already off-grid.
+    local OFFSETS = { {0,0}, {1,0}, {-1,0}, {0,1}, {0,-1}, {1,1} }
+    for _, off in ipairs(OFFSETS) do
+        local tile = Grid.get(g, cx + off[1], cy + off[2])
+        if tile then tile.type = C.TILE.IRON_DEPOSIT end
+    end
+end
+
+-- Build a new world. The grid is all grass; iron deposits are seeded in a
+-- corner quadrant; the RNG is seeded so growth and deposit placement are
 -- reproducible; demand starts neutral; the treasury starts funded and the
 -- economy's last-net readout at zero.
 -- opts (4c-2): per-mission overrides applied at construction. Currently just
 -- start_treasury (set by the difficulty preset chosen on the charter screen).
 function World.new(seed, opts)
     opts = opts or {}
-    return {
-        grid = Grid.new(),
-        rng = RNG.new(seed),
-        demand = { residential = 0, commercial = 0, industrial = 0 },
-        clock = { months = 0 },                       -- elapsed sim-months; the clock system advances it
-        treasury = opts.start_treasury or C.ECON.START_TREASURY,
-        economy = { last_net = 0 },                -- last month's net delta, for the HUD
-        roads = { connected = {} },                -- Derived road-connectivity cache
-        power = { topology = {}, powered = {} },   -- Derived power state, rebuilt from the grid on load
-        pollution = { field = {}, dirty = false }, -- Derived diffusion field; lazily rebuilt from the grid
-        -- 4c-1 step 5: charter slots. Empty tables until World.charter
-        -- (called by the New Mission screen in step 6) populates them.
-        crew = {},    -- 1..5 specialists when chartered
-        mission = {}, -- mission name/difficulty/world params when chartered
+    local world = {
+        grid      = Grid.new(),
+        rng       = RNG.new(seed),
+        demand    = { residential = 0, commercial = 0, industrial = 0 },
+        clock     = { months = 0 },
+        treasury  = opts.start_treasury or C.ECON.START_TREASURY,
+        economy   = { last_net = 0 },
+        roads     = { connected = {} },
+        power     = { topology = {}, powered = {} },
+        pollution = { field = {}, dirty = false },
+        -- Phase 5: typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
+        goods     = { supply = {}, demand = {}, inventory = {} },
+        crew      = {},
+        mission   = {},
     }
+    seed_deposits(world)
+    return world
 end
 
 -- WRITE: charter a mission -- set world.mission and world.crew atomically and
@@ -230,6 +263,18 @@ end
 function World.business_count(world)
     return World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
         + World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
+end
+
+-- READ: positions of every IRON_DEPOSIT tile, as a list of {x, y} pairs.
+-- Used by the build-mine tool to highlight valid placement tiles.
+function World.deposit_tiles(world)
+    local result = {}
+    Grid.each(world.grid, function(x, y, tile)
+        if tile.type == C.TILE.IRON_DEPOSIT then
+            result[#result + 1] = { x = x, y = y }
+        end
+    end)
+    return result
 end
 
 -- READ: number of power plants, counted by anchor tile.

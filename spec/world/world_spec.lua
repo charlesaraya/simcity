@@ -340,6 +340,90 @@ describe("World", function()
         end)
     end)
 
+    -- Phase 5 step 1: typed goods data layer + iron deposit seeding
+    describe("goods", function()
+        it("new() initializes world.goods with empty supply, demand, inventory", function()
+            local w = World.new(1)
+            assert.are.same({}, w.goods.supply)
+            assert.are.same({}, w.goods.demand)
+            assert.are.same({}, w.goods.inventory)
+        end)
+    end)
+
+    describe("iron deposit seeding", function()
+        it("new() seeds at least C.DEPOSIT.CLUSTER iron deposit tiles", function()
+            local w = World.new(42)
+            local deposits = World.deposit_tiles(w)
+            assert.is_true(#deposits >= C.DEPOSIT.CLUSTER,
+                "expected >= " .. C.DEPOSIT.CLUSTER .. " deposits, got " .. #deposits)
+        end)
+
+        it("deposit cluster lands in a corner quadrant (never near map center)", function()
+            -- All deposit tiles must satisfy: x in outer band OR y in outer band.
+            -- With CORNER_REACH=14 + max cluster offset of 1, every tile is within
+            -- CORNER_REACH+2 tiles of some edge.
+            local w = World.new(7)
+            local deposits = World.deposit_tiles(w)
+            local gw = w.grid.width
+            local gh = w.grid.height
+            local band = C.DEPOSIT.CORNER_REACH + 2
+            for _, pos in ipairs(deposits) do
+                local near_h_edge = pos.x <= band or pos.x >= gw - band + 1
+                local near_v_edge = pos.y <= band or pos.y >= gh - band + 1
+                assert.is_true(near_h_edge and near_v_edge,
+                    "deposit at (" .. pos.x .. "," .. pos.y .. ") is not in a corner quadrant")
+            end
+        end)
+
+        it("deposit placement is seed-deterministic: same seed = same positions", function()
+            local d1 = World.deposit_tiles(World.new(99))
+            local d2 = World.deposit_tiles(World.new(99))
+            assert.are.equal(#d1, #d2)
+            for i = 1, #d1 do
+                assert.are.equal(d1[i].x, d2[i].x)
+                assert.are.equal(d1[i].y, d2[i].y)
+            end
+        end)
+
+        it("different seeds produce different deposit positions", function()
+            local d1 = World.deposit_tiles(World.new(1))
+            local d2 = World.deposit_tiles(World.new(999999))
+            local same = true
+            if #d1 == #d2 then
+                for i = 1, #d1 do
+                    if d1[i].x ~= d2[i].x or d1[i].y ~= d2[i].y then
+                        same = false
+                        break
+                    end
+                end
+            else
+                same = false
+            end
+            assert.is_false(same, "different seeds should produce different deposit layouts")
+        end)
+    end)
+
+    describe("deposit_tiles", function()
+        it("returns every IRON_DEPOSIT position", function()
+            local w = World.new(5)
+            local deposits = World.deposit_tiles(w)
+            -- Verify each returned position actually has the right tile type.
+            for _, pos in ipairs(deposits) do
+                local tile = w.grid.tiles[w.grid.width * (pos.y - 1) + pos.x]
+                assert.are.equal(C.TILE.IRON_DEPOSIT, tile.type)
+            end
+        end)
+
+        it("returns empty list when no deposit tiles exist", function()
+            local w = World.new(1)
+            -- Overwrite all deposit tiles back to grass.
+            for _, pos in ipairs(World.deposit_tiles(w)) do
+                w.grid.tiles[w.grid.width * (pos.y - 1) + pos.x].type = C.TILE.GRASS
+            end
+            assert.are.same({}, World.deposit_tiles(w))
+        end)
+    end)
+
     describe("counters", function()
         local function build(w, x, y, zone)
             World.zone_tile(w, x, y, zone)
