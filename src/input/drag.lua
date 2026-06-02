@@ -125,6 +125,42 @@ function Drag.plant_affordable(world)
     return world.treasury >= C.PLANT.COST
 end
 
+-- Rail runs reuse road_run geometry (axis-only straight line). Validity blocks
+-- roads, mines, and the same hard obstacles as road_run_valid. Existing rail
+-- tiles pass through (no-ops at build time, not charged).
+function Drag.rail_run_valid(world, run)
+    for _, t in ipairs(run) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if not tile then return false end
+        if tile.road or tile.mine then return false end
+        if tile.zone ~= C.ZONE.NONE or tile.building then return false end
+        if tile.plant or tile.plant_part then return false end
+    end
+    return true
+end
+
+local function count_rail_buildable(world, run)
+    local n = 0
+    for _, t in ipairs(run) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if tile and not tile.rail and not tile.road and not tile.power_line
+        and not tile.plant and not tile.plant_part
+        and not tile.building and not tile.mine
+        and tile.zone == C.ZONE.NONE then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+function Drag.rail_cost(world, run)
+    return count_rail_buildable(world, run) * C.RAIL.COST
+end
+
+function Drag.rail_affordable(world, run)
+    return world.treasury >= Drag.rail_cost(world, run)
+end
+
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in
 -- the target zone (or roads) are no-ops at commit, so they aren't charged.
 function Drag.zone_cost(world, tiles, zone)

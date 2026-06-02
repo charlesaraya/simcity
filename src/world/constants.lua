@@ -51,6 +51,8 @@ C.COLOR        = {
     BUILD_PENDING   = { 0.60, 0.60, 0.60 }, -- under construction (any zone)
 
     ROAD            = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
+    RAIL            = { 0.55, 0.45, 0.28 }, -- weathered steel / ballast tan
+    PREVIEW_RAIL    = { 0.75, 0.65, 0.40 }, -- lighter tan for drag preview
 
     -- Iron deposit terrain + mine building marker.
     IRON_DEPOSIT_A  = { 0.54, 0.36, 0.20 }, -- warm rust-brown
@@ -166,6 +168,12 @@ C.TOOL         = {
     POWER_LINE = 6,
     PLANT      = 7,
     MINE       = 8,
+    RAIL       = 9,
+}
+
+-- Freight rail tuning (Phase 5 step 4). No monthly upkeep (like roads).
+C.RAIL         = {
+    COST = 15, -- per tile, one-time
 }
 
 -- Iron Mine tuning (Phase 5 step 3).
@@ -288,6 +296,8 @@ C.EVENTS       = {
     POWER_LINE_REMOVED   = "power_line_removed",
     MINE_BUILT           = "mine_built",
     MINE_REMOVED         = "mine_removed",
+    RAIL_BUILT           = "rail_built",
+    RAIL_REMOVED         = "rail_removed",
     -- Phase 4c-1: published by World.charter when New Mission populates
     -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
     -- only); Phase 5+ mechanics can subscribe without touching the writer.

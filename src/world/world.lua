@@ -73,6 +73,7 @@ function World.new(seed, opts)
         treasury  = opts.start_treasury or C.ECON.START_TREASURY,
         economy   = { last_net = 0 },
         roads     = { connected = {} },
+        rails     = { components = {} },
         power     = { topology = {}, powered = {} },
         pollution = { field = {}, dirty = false },
         -- Phase 5: typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
@@ -134,6 +135,11 @@ function World.bulldoze(world, x, y)
     if tile.mine then
         tile.mine = nil
         Bus.publish(C.EVENTS.MINE_REMOVED, { x = x, y = y })
+        return true
+    end
+    if tile.rail then
+        tile.rail = nil
+        Bus.publish(C.EVENTS.RAIL_REMOVED, { x = x, y = y })
         return true
     end
     if tile.power_line then
@@ -268,6 +274,19 @@ end
 function World.business_count(world)
     return World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
         + World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
+end
+
+-- WRITE: lay a freight rail tile. Mutually exclusive with roads, zones, and
+-- buildings. Existing rail is a no-op (idempotent, like build_road).
+function World.build_rail(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not tile then return false end
+    if tile.road or tile.power_line or tile.plant or tile.plant_part
+    or tile.building or tile.mine or tile.rail then return false end
+    if tile.zone ~= C.ZONE.NONE then return false end
+    tile.rail = true
+    Bus.publish(C.EVENTS.RAIL_BUILT, { x = x, y = y })
+    return true
 end
 
 -- WRITE: place an iron mine on an IRON_DEPOSIT tile. Refused on any other

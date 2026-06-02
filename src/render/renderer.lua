@@ -22,6 +22,7 @@ local function tile_color(tile, x, y)
     if tile.plant or tile.plant_part then return C.COLOR.PLANT end
     if tile.power_line then return C.COLOR.POWER_LINE end
     if tile.road then return C.COLOR.ROAD end
+    if tile.rail then return C.COLOR.RAIL end
     if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.ZONE_RES end
     if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.ZONE_COM end
     if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.ZONE_IND end

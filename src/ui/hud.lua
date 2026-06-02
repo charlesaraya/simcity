@@ -43,6 +43,7 @@ local TOOL_NAME = {
     [C.TOOL.POWER_LINE] = "POWER LINE",
     [C.TOOL.PLANT]      = "POWER PLANT",
     [C.TOOL.MINE]       = "IRON MINE",
+    [C.TOOL.RAIL]       = "FREIGHT RAIL",
 }
 
 local OVERLAY_NAME = {
@@ -156,7 +157,7 @@ function Hud.draw(world, opts)
     love.graphics.setFont(Theme.font("meta"))
     love.graphics.setColor(Theme.color("fg"))
     love.graphics.print(
-        "[1]BULLDOZE  [2]RES  [3]COM  [4]IND  [5]ROAD  [6]LINE  [7]PLANT  [8]MINE  |  DRAG TO BUILD  |  [O]VERLAY  |  SPACE PAUSE  +/- SPEED  |  F5 SAVE  F9 LOAD  |  WASD/SCROLL CAMERA",
+        "[1]BULLDOZE  [2]RES  [3]COM  [4]IND  [5]ROAD  [6]LINE  [7]PLANT  [8]MINE  [9]RAIL  |  DRAG TO BUILD  |  [O]VERLAY  |  SPACE PAUSE  +/- SPEED  |  F5 SAVE  F9 LOAD  |  WASD/SCROLL CAMERA",
         12, H - hint_h + 8)
 end
 

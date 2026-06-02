@@ -23,6 +23,7 @@ local Roads = require("src.systems.roads")
 local Power = require("src.systems.power")
 local Pollution = require("src.systems.pollution")
 local Goods     = require("src.systems.goods")
+local Rails     = require("src.systems.rails")
 local Tools = require("src.input.tools")
 local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
@@ -83,6 +84,7 @@ local TOOL_KEYS = {
     ["6"] = C.TOOL.POWER_LINE,
     ["7"] = C.TOOL.PLANT,
     ["8"] = C.TOOL.MINE,
+    ["9"] = C.TOOL.RAIL,
 }
 
 -- Tile coords where the current drag began (nil when not dragging). Roads and
@@ -101,7 +103,8 @@ local ZONE_PREVIEW_COLOR = {
 }
 
 local function is_drag_tool(tool)
-    return tool == C.TOOL.ROAD or tool == C.TOOL.POWER_LINE or ZONE_OF[tool] ~= nil
+    return tool == C.TOOL.ROAD or tool == C.TOOL.POWER_LINE
+        or tool == C.TOOL.RAIL or ZONE_OF[tool] ~= nil
 end
 
 -- Transient HUD status ("Saved"/"Loaded"), cleared after a short while.
@@ -119,6 +122,7 @@ local function wire_world(w)
     Bus.clear()
     Zoning.install(w)
     Roads.install(w)       -- recomputes the road-connectivity cache from the grid (on load too)
+    Rails.install(w)       -- recomputes rail component labeling from the grid
     Power.install(w)       -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
     Pollution.install(w)   -- subscribes source events (sets dirty); seeds the field from the grid
     Economy.install(w)     -- subscribes the one-time road/line/plant debits
@@ -149,10 +153,14 @@ local function current_drag(cx, cy)
         return { tiles = run, color = C.COLOR.PREVIEW_ROAD, valid = valid }, Drag.road_cost(world, run)
     end
     if current_tool == C.TOOL.POWER_LINE then
-        -- Power lines reuse the road run's geometry and validity; only price differs.
         local run = Drag.road_run(sx, sy, cx, cy)
         local valid = Drag.road_run_valid(world, run) and Drag.power_line_affordable(world, run)
         return { tiles = run, color = C.COLOR.POWER_LINE, valid = valid }, Drag.power_line_cost(world, run)
+    end
+    if current_tool == C.TOOL.RAIL then
+        local run = Drag.road_run(sx, sy, cx, cy)
+        local valid = Drag.rail_run_valid(world, run) and Drag.rail_affordable(world, run)
+        return { tiles = run, color = C.COLOR.PREVIEW_RAIL, valid = valid }, Drag.rail_cost(world, run)
     end
     local zone = ZONE_OF[current_tool]
     if not zone then return nil end -- tool is not a zone (e.g. changed mid-drag): no preview
@@ -597,6 +605,8 @@ function love.mousereleased(x, y, button)
             Tools.apply_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         elseif current_tool == C.TOOL.POWER_LINE then
             Tools.apply_line_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
+        elseif current_tool == C.TOOL.RAIL then
+            Tools.apply_rail_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         else
             Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
         end

@@ -91,6 +91,18 @@ function Tools.apply_rect(tool, world, tiles)
     return true
 end
 
+-- Commit a dragged freight rail run, all-or-nothing: only if the run is valid
+-- AND the whole new-tile cost is affordable. Existing rail is passed over.
+function Tools.apply_rail_run(world, run)
+    if not (Drag.rail_run_valid(world, run) and Drag.rail_affordable(world, run)) then
+        return false
+    end
+    for _, t in ipairs(run) do
+        World.build_rail(world, t.x, t.y)
+    end
+    return true
+end
+
 -- Place a 2x2 power plant anchored at (x, y), all-or-nothing: only if the whole
 -- footprint is clear grass AND the flat plant cost is affordable.
 function Tools.apply_plant(world, x, y)

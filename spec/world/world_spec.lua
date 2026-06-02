@@ -340,6 +340,73 @@ describe("World", function()
         end)
     end)
 
+    -- Phase 5 step 4: freight rail
+    describe("build_rail", function()
+        local function tile_at(w, x, y)
+            return w.grid.tiles[w.grid.width * (y - 1) + x]
+        end
+
+        it("lays rail on plain grass and publishes rail_built", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.RAIL_BUILT)
+            assert.is_true(World.build_rail(w, 20, 20))
+            assert.is_true(tile_at(w, 20, 20).rail)
+            assert.are.equal(1, spy.called)
+            assert.are.same({ x = 20, y = 20 }, spy.data)
+        end)
+
+        it("is idempotent: re-laying rail is a no-op", function()
+            local w = World.new(1)
+            World.build_rail(w, 20, 20)
+            local spy = spy_on(C.EVENTS.RAIL_BUILT)
+            assert.is_false(World.build_rail(w, 20, 20))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses a road tile", function()
+            local w = World.new(1)
+            World.build_road(w, 20, 20)
+            assert.is_false(World.build_rail(w, 20, 20))
+        end)
+
+        it("refuses a zoned tile", function()
+            local w = World.new(1)
+            World.zone_tile(w, 20, 20, C.ZONE.INDUSTRIAL)
+            assert.is_false(World.build_rail(w, 20, 20))
+        end)
+
+        it("succeeds on an IRON_DEPOSIT tile with no mine", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            local x, y = deposits[1].x, deposits[1].y
+            assert.is_true(World.build_rail(w, x, y))
+        end)
+
+        it("refuses an IRON_DEPOSIT tile that has a mine", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            local x, y = deposits[1].x, deposits[1].y
+            World.build_mine(w, x, y)
+            assert.is_false(World.build_rail(w, x, y))
+        end)
+
+        it("rejects out-of-bounds", function()
+            local w = World.new(1)
+            assert.is_false(World.build_rail(w, 999, 999))
+        end)
+
+        it("bulldoze removes rail and publishes rail_removed only", function()
+            local w = World.new(1)
+            World.build_rail(w, 20, 20)
+            local removed   = spy_on(C.EVENTS.RAIL_REMOVED)
+            local bulldozed = spy_on(C.EVENTS.TILE_BULLDOZED)
+            assert.is_true(World.bulldoze(w, 20, 20))
+            assert.is_nil(tile_at(w, 20, 20).rail)
+            assert.are.equal(1, removed.called)
+            assert.are.equal(0, bulldozed.called)
+        end)
+    end)
+
     -- Phase 5 step 3: iron mine placement
     describe("build_mine", function()
         local function deposit_pos(w)
