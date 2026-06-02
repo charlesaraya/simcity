@@ -25,7 +25,10 @@ local function tile_color(tile, x, y)
     if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.ZONE_RES end
     if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.ZONE_COM end
     if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.ZONE_IND end
-    -- unzoned: keep the grass checkerboard
+    -- Iron deposit terrain (with or without a mine on top).
+    if tile.type == C.TILE.IRON_DEPOSIT then
+        return ((x + y) % 2 == 0) and C.COLOR.IRON_DEPOSIT_A or C.COLOR.IRON_DEPOSIT_B
+    end
     return ((x + y) % 2 == 0) and C.COLOR.GRASS_A or C.COLOR.GRASS_B
 end
 
@@ -76,6 +79,13 @@ function Renderer.draw(world, cam, hover, preview, overlay)
                 love.graphics.polygon("line", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
                 love.graphics.setLineWidth(1)
             end
+        end
+        if tile.mine then
+            local cx, cy = Iso.tile_to_screen(x, y)
+            local hw = (C.TILE_W / 2) * BUILD_SCALE
+            local hh = (C.TILE_H / 2) * BUILD_SCALE
+            love.graphics.setColor(C.COLOR.BUILD_MINE)
+            love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
         end
     end)
 

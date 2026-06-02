@@ -45,6 +45,9 @@ function Tools.apply(tool, world, x, y)
         return World.build_power_line(world, x, y)
     elseif tool == C.TOOL.PLANT then
         return Tools.apply_plant(world, x, y)
+    elseif tool == C.TOOL.MINE then
+        if world.treasury < C.IRON_MINE.COST then return false end
+        return World.build_mine(world, x, y)
     end
     return false
 end

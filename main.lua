@@ -82,6 +82,7 @@ local TOOL_KEYS = {
     ["5"] = C.TOOL.ROAD,
     ["6"] = C.TOOL.POWER_LINE,
     ["7"] = C.TOOL.PLANT,
+    ["8"] = C.TOOL.MINE,
 }
 
 -- Tile coords where the current drag began (nil when not dragging). Roads and
@@ -483,6 +484,15 @@ function love.draw()
             local valid = Drag.plant_footprint_valid(world, tx, ty) and Drag.plant_affordable(world)
             preview = { tiles = Drag.plant_footprint(tx, ty), color = C.COLOR.PLANT, valid = valid }
             drag_cost = Drag.plant_cost()
+        elseif current_tool == C.TOOL.MINE and tx then
+            -- Mine is a single click on an IRON_DEPOSIT tile.
+            local tile = Grid.get(world.grid, tx, ty)
+            local valid = tile and tile.type == C.TILE.IRON_DEPOSIT
+                and not tile.road and not tile.mine and not tile.building
+                and tile.zone == C.ZONE.NONE
+                and world.treasury >= C.IRON_MINE.COST
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.BUILD_MINE, valid = valid }
+            drag_cost = C.IRON_MINE.COST
         end
         Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
         local msg = (love.timer.getTime() < status_until) and status_msg or nil
@@ -560,9 +570,14 @@ function love.mousepressed(x, y, button)
     if button ~= 1 then return end
     local tx, ty = hovered_tile()
     if not tx then return end
-    -- Plant places on a single click (not a drag), all-or-nothing and self-gating.
+    -- Plant and Mine place on a single click (not drags), all-or-nothing and self-gating.
     if current_tool == C.TOOL.PLANT then
         Tools.apply_plant(world, tx, ty)
+        mark_dirty()
+        return
+    end
+    if current_tool == C.TOOL.MINE then
+        Tools.apply(C.TOOL.MINE, world, tx, ty)
         mark_dirty()
         return
     end

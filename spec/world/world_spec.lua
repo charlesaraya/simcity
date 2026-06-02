@@ -340,6 +340,85 @@ describe("World", function()
         end)
     end)
 
+    -- Phase 5 step 3: iron mine placement
+    describe("build_mine", function()
+        local function deposit_pos(w)
+            local deposits = World.deposit_tiles(w)
+            return deposits[1].x, deposits[1].y
+        end
+
+        it("places a mine on an IRON_DEPOSIT tile and publishes mine_built", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.MINE_BUILT)
+            local x, y = deposit_pos(w)
+            assert.is_true(World.build_mine(w, x, y))
+            assert.is_true(w.grid.tiles[w.grid.width * (y - 1) + x].mine)
+            assert.are.equal(1, spy.called)
+            assert.are.same({ x = x, y = y }, spy.data)
+        end)
+
+        it("refuses placement on a GRASS tile", function()
+            local w = World.new(1)
+            local spy = spy_on(C.EVENTS.MINE_BUILT)
+            assert.is_false(World.build_mine(w, 32, 32))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses if the deposit tile already has a mine", function()
+            local w = World.new(1)
+            local x, y = deposit_pos(w)
+            World.build_mine(w, x, y)
+            assert.is_false(World.build_mine(w, x, y))
+        end)
+
+        it("refuses if the deposit tile has a road", function()
+            local w = World.new(1)
+            local x, y = deposit_pos(w)
+            w.grid.tiles[w.grid.width * (y - 1) + x].road = true
+            local spy = spy_on(C.EVENTS.MINE_BUILT)
+            assert.is_false(World.build_mine(w, x, y))
+            assert.are.equal(0, spy.called)
+        end)
+
+        it("refuses out-of-bounds coordinates", function()
+            local w = World.new(1)
+            assert.is_false(World.build_mine(w, 999, 999))
+        end)
+    end)
+
+    describe("mine_count", function()
+        it("returns 0 on a fresh world (no mines placed)", function()
+            local w = World.new(1)
+            assert.are.equal(0, World.mine_count(w))
+        end)
+
+        it("counts each placed mine", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            World.build_mine(w, deposits[1].x, deposits[1].y)
+            assert.are.equal(1, World.mine_count(w))
+            if #deposits >= 2 then
+                World.build_mine(w, deposits[2].x, deposits[2].y)
+                assert.are.equal(2, World.mine_count(w))
+            end
+        end)
+    end)
+
+    describe("bulldoze mine", function()
+        it("removes mine and publishes mine_removed", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            local x, y = deposits[1].x, deposits[1].y
+            World.build_mine(w, x, y)
+            local removed  = spy_on(C.EVENTS.MINE_REMOVED)
+            local bulldozed = spy_on(C.EVENTS.TILE_BULLDOZED)
+            assert.is_true(World.bulldoze(w, x, y))
+            assert.is_nil(w.grid.tiles[w.grid.width * (y - 1) + x].mine)
+            assert.are.equal(1, removed.called)
+            assert.are.equal(0, bulldozed.called)
+        end)
+    end)
+
     -- Phase 5 step 1: typed goods data layer + iron deposit seeding
     describe("goods", function()
         it("new() initializes world.goods with empty supply, demand, inventory", function()

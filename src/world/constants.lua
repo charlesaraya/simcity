@@ -52,9 +52,10 @@ C.COLOR        = {
 
     ROAD            = { 0.32, 0.32, 0.35 }, -- asphalt gray (programmer art)
 
-    -- Iron deposit terrain.
+    -- Iron deposit terrain + mine building marker.
     IRON_DEPOSIT_A  = { 0.54, 0.36, 0.20 }, -- warm rust-brown
     IRON_DEPOSIT_B  = { 0.48, 0.31, 0.16 }, -- darker rust-brown (checker B)
+    BUILD_MINE      = { 0.72, 0.48, 0.25 }, -- bronze; distinguishes mine from zone buildings
 
     -- Power network.
     POWER_LINE      = { 0.55, 0.60, 0.78 }, -- steel-blue cable
@@ -164,6 +165,14 @@ C.TOOL         = {
     ROAD       = 5,
     POWER_LINE = 6,
     PLANT      = 7,
+    MINE       = 8,
+}
+
+-- Iron Mine tuning (Phase 5 step 3).
+C.IRON_MINE    = {
+    COST       = 200, -- one-time placement cost
+    UPKEEP     = 5,   -- monthly maintenance
+    PRODUCTION = 4,   -- raw_materials units produced per month
 }
 
 -- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep).
@@ -277,6 +286,8 @@ C.EVENTS       = {
     PLANT_REMOVED        = "plant_removed",
     POWER_LINE_BUILT     = "power_line_built",
     POWER_LINE_REMOVED   = "power_line_removed",
+    MINE_BUILT           = "mine_built",
+    MINE_REMOVED         = "mine_removed",
     -- Phase 4c-1: published by World.charter when New Mission populates
     -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
     -- only); Phase 5+ mechanics can subscribe without touching the writer.

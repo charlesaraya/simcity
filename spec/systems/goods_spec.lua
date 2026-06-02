@@ -21,6 +21,25 @@ describe("Goods", function()
             local w = World.new(1)
             assert.are.same({}, Goods.supply_rate(w))
         end)
+
+        it("returns RAW_MATERIALS production for each placed mine", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            World.build_mine(w, deposits[1].x, deposits[1].y)
+            local s = Goods.supply_rate(w)
+            assert.are.equal(C.IRON_MINE.PRODUCTION, s[C.GOODS.RAW_MATERIALS])
+        end)
+
+        it("accumulates supply across multiple mines", function()
+            local w = World.new(1)
+            local deposits = World.deposit_tiles(w)
+            World.build_mine(w, deposits[1].x, deposits[1].y)
+            if #deposits >= 2 then
+                World.build_mine(w, deposits[2].x, deposits[2].y)
+                local s = Goods.supply_rate(w)
+                assert.are.equal(2 * C.IRON_MINE.PRODUCTION, s[C.GOODS.RAW_MATERIALS])
+            end
+        end)
     end)
 
     describe("demand_rate", function()
@@ -130,6 +149,17 @@ describe("Goods", function()
             -- No industry -> demand = 0, supply = 0, net = 0: stays at cap.
             Goods.system().tick(w)
             assert.are.equal(C.GOODS_TUNE.MAX_INVENTORY,
+                w.goods.inventory[C.GOODS.RAW_MATERIALS])
+        end)
+
+        it("mine supplies industry: inventory grows when supply > demand", function()
+            local w = World.new(1)
+            -- Place one mine (supply = PRODUCTION/month).
+            local deposits = World.deposit_tiles(w)
+            World.build_mine(w, deposits[1].x, deposits[1].y)
+            -- No industry -> demand = 0; all supply goes to inventory.
+            Goods.system().tick(w)
+            assert.are.equal(C.IRON_MINE.PRODUCTION,
                 w.goods.inventory[C.GOODS.RAW_MATERIALS])
         end)
     end)

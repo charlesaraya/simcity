@@ -14,7 +14,6 @@ local Goods = {}
 
 -- Pure: monthly supply rate per good type, summed across all producer buildings.
 -- Returns a table keyed by C.GOODS.* integers.
--- Iron Mine producers are added in step 3 and extend this scan.
 function Goods.supply_rate(world)
     local rates = {}
     Grid.each(world.grid, function(_, _, tile)

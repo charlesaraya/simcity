@@ -131,6 +131,11 @@ function World.bulldoze(world, x, y)
         Bus.publish(C.EVENTS.PLANT_REMOVED, { x = ax, y = ay })
         return true
     end
+    if tile.mine then
+        tile.mine = nil
+        Bus.publish(C.EVENTS.MINE_REMOVED, { x = x, y = y })
+        return true
+    end
     if tile.power_line then
         tile.power_line = nil
         Bus.publish(C.EVENTS.POWER_LINE_REMOVED, { x = x, y = y })
@@ -263,6 +268,29 @@ end
 function World.business_count(world)
     return World.count_buildings(world, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
         + World.count_buildings(world, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
+end
+
+-- WRITE: place an iron mine on an IRON_DEPOSIT tile. Refused on any other
+-- terrain type, or if the tile already has infrastructure or a mine.
+function World.build_mine(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not tile then return false end
+    if tile.type ~= C.TILE.IRON_DEPOSIT then return false end
+    if tile.road or tile.power_line or tile.plant or tile.plant_part
+    or tile.building or tile.mine then return false end
+    if tile.zone ~= C.ZONE.NONE then return false end
+    tile.mine = true
+    Bus.publish(C.EVENTS.MINE_BUILT, { x = x, y = y })
+    return true
+end
+
+-- READ: number of active iron mines (anchor tiles only).
+function World.mine_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.mine then n = n + 1 end
+    end)
+    return n
 end
 
 -- READ: positions of every IRON_DEPOSIT tile, as a list of {x, y} pairs.
