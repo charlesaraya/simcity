@@ -240,6 +240,20 @@ C.GOODS        = {
     PROCESSED_GOODS = 2,
 }
 
+-- Goods system tuning.
+-- BUFFER_MONTHS: months of demand stored in inventory = 100% efficiency.
+-- MAX_INVENTORY: per-good stockpile cap (prevents infinite buffering).
+C.GOODS_TUNE   = {
+    BUFFER_MONTHS = 3,
+    MAX_INVENTORY = 500,
+}
+
+-- Raw-materials demand per completed industrial building per month.
+-- Keyed by C.GOODS.* integer so Goods.demand_rate() can iterate directly.
+C.IND_DEMAND   = {
+    [C.GOODS.RAW_MATERIALS] = 2,
+}
+
 -- Iron-deposit seeding at world-gen.
 -- EDGE_PAD:     min tiles from the map edge the deposit centre may land.
 -- CORNER_REACH: max tiles from the corner (bounds the deposit to a corner quadrant).
