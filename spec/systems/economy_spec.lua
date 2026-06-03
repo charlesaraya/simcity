@@ -221,6 +221,34 @@ describe("Economy", function()
         end)
     end)
 
+    describe("install (mine expense)", function()
+        it("debits IRON_MINE.COST when a mine is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local deposits = World.deposit_tiles(w)
+            local before = w.treasury
+            World.build_mine(w, deposits[1].x, deposits[1].y)
+            assert.are.equal(before - C.IRON_MINE.COST, w.treasury)
+        end)
+
+        it("debits RAIL.COST per rail tile built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_rail(w, 5, 5)
+            World.build_rail(w, 6, 5)
+            assert.are.equal(before - 2 * C.RAIL.COST, w.treasury)
+        end)
+
+        it("debits FREIGHT_STATION.COST when a station is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.build_station(w, 10, 10)
+            assert.are.equal(before - C.FREIGHT_STATION.COST, w.treasury)
+        end)
+    end)
+
     describe("install (power expense)", function()
         it("debits PLANT.COST when a plant is built", function()
             local w = World.new(1)

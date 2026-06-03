@@ -12,6 +12,8 @@ local Ramp = require("src.render.ramp")
 local Pollution = require("src.systems.pollution")
 local LandValue = require("src.systems.land_value")
 local Power = require("src.systems.power")
+local Rails = require("src.systems.rails")
+local Freight = require("src.systems.freight")
 local C = require("src.world.constants")
 
 local Overlays = {}
@@ -47,6 +49,25 @@ function Overlays.color(overlay, world, x, y, lo, hi)
             return C.RAMP.POWER.served
         elseif conductor or tile.building then
             return C.RAMP.POWER.unserved
+        end
+        return nil
+    elseif overlay == C.OVERLAY.FREIGHT then
+        local tile = Grid.get(world.grid, x, y)
+        -- Station footprint: always white regardless of bridging state.
+        if tile.station or tile.station_part then
+            return C.RAMP.FREIGHT.station
+        end
+        -- Rail tiles: green when their component is bridged, red when isolated.
+        if tile.rail then
+            local cid = Rails.tile_component(world, x, y)
+            return Freight.rail_bridged(world, cid)
+                and C.RAMP.FREIGHT.linked or C.RAMP.FREIGHT.unlinked
+        end
+        -- Mine tiles: green when adjacent to a bridged component, red otherwise.
+        if tile.mine then
+            local cid = Rails.adjacent_component(world, x, y)
+            return Freight.rail_bridged(world, cid)
+                and C.RAMP.FREIGHT.linked or C.RAMP.FREIGHT.unlinked
         end
         return nil
     end

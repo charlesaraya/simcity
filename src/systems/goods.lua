@@ -7,21 +7,62 @@
 -- Goods.efficiency() into growth.lua. Steps 2–5 build the data layer cleanly;
 -- step 6 is the single point that applies it to industrial output.
 
-local Grid = require("src.world.grid")
-local C    = require("src.world.constants")
+local Grid  = require("src.world.grid")
+local Rails = require("src.systems.rails")
+local C     = require("src.world.constants")
 
 local Goods = {}
 
--- Pure: monthly supply rate per good type, summed across all producer buildings.
--- Returns a table keyed by C.GOODS.* integers.
+local SUPPLY_DIRS = {{1,0},{-1,0},{0,1},{0,-1}}
+
+-- Pure: monthly supply rate per good type.
+-- A mine contributes only when its 4-connected mine cluster has at least one
+-- tile adjacent to a bridged rail component. One rail connection serves the
+-- whole deposit cluster — the player needn't run rail past every mine tile.
 function Goods.supply_rate(world)
-    local rates = {}
-    Grid.each(world.grid, function(_, _, tile)
-        if tile.mine then
-            local g = C.GOODS.RAW_MATERIALS
-            rates[g] = (rates[g] or 0) + C.IRON_MINE.PRODUCTION
+    local bridged = (world.freight and world.freight.bridged) or {}
+    local accessible = {}  -- set of mine tile indices that can contribute
+    local seen = {}        -- BFS visited set
+
+    Grid.each(world.grid, function(x, y, tile)
+        if not tile.mine then return end
+        local start = Grid.idx(world.grid, x, y)
+        if seen[start] then return end
+
+        -- BFS: collect this mine's connected cluster, check for any bridged rail neighbor.
+        local cluster = {}
+        local has_access = false
+        local q = {{x, y}}
+        while #q > 0 do
+            local pos = table.remove(q, 1)
+            local px, py = pos[1], pos[2]
+            local pidx = Grid.idx(world.grid, px, py)
+            if not seen[pidx] then
+                seen[pidx] = true
+                cluster[#cluster + 1] = pidx
+                local cid = Rails.adjacent_component(world, px, py)
+                if cid and bridged[cid] then has_access = true end
+                for _, d in ipairs(SUPPLY_DIRS) do
+                    local nx, ny = px + d[1], py + d[2]
+                    local nt = Grid.get(world.grid, nx, ny)
+                    if nt and nt.mine then
+                        local nidx = Grid.idx(world.grid, nx, ny)
+                        if not seen[nidx] then q[#q + 1] = {nx, ny} end
+                    end
+                end
+            end
+        end
+
+        if has_access then
+            for _, cidx in ipairs(cluster) do accessible[cidx] = true end
         end
     end)
+
+    local rates = {}
+    for _ in pairs(accessible) do
+        rates[C.GOODS.RAW_MATERIALS] =
+            (rates[C.GOODS.RAW_MATERIALS] or 0) + C.IRON_MINE.PRODUCTION
+    end
     return rates
 end
 

@@ -24,6 +24,7 @@ local Power = require("src.systems.power")
 local Pollution = require("src.systems.pollution")
 local Goods     = require("src.systems.goods")
 local Rails     = require("src.systems.rails")
+local Freight   = require("src.systems.freight")
 local Tools = require("src.input.tools")
 local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
@@ -71,7 +72,8 @@ local OVERLAY_CYCLE = {
     [C.OVERLAY.NONE]       = C.OVERLAY.POLLUTION,
     [C.OVERLAY.POLLUTION]  = C.OVERLAY.LAND_VALUE,
     [C.OVERLAY.LAND_VALUE] = C.OVERLAY.POWER,
-    [C.OVERLAY.POWER]      = C.OVERLAY.NONE,
+    [C.OVERLAY.POWER]      = C.OVERLAY.FREIGHT,
+    [C.OVERLAY.FREIGHT]    = C.OVERLAY.NONE,
 }
 
 -- Number keys 1-7 select a tool.
@@ -85,6 +87,7 @@ local TOOL_KEYS = {
     ["7"] = C.TOOL.PLANT,
     ["8"] = C.TOOL.MINE,
     ["9"] = C.TOOL.RAIL,
+    ["0"] = C.TOOL.FREIGHT_STATION,
 }
 
 -- Tile coords where the current drag began (nil when not dragging). Roads and
@@ -123,6 +126,7 @@ local function wire_world(w)
     Zoning.install(w)
     Roads.install(w)       -- recomputes the road-connectivity cache from the grid (on load too)
     Rails.install(w)       -- recomputes rail component labeling from the grid
+    Freight.install(w)     -- recomputes freight-bridge state (depends on Rails)
     Power.install(w)       -- AFTER Roads: the plant-supply gate reads roads.connected (bus order)
     Pollution.install(w)   -- subscribes source events (sets dirty); seeds the field from the grid
     Economy.install(w)     -- subscribes the one-time road/line/plant debits
@@ -501,6 +505,11 @@ function love.draw()
                 and world.treasury >= C.IRON_MINE.COST
             preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.BUILD_MINE, valid = valid }
             drag_cost = C.IRON_MINE.COST
+        elseif current_tool == C.TOOL.FREIGHT_STATION and tx then
+            -- Station is a single click: preview its 2×2 footprint, red when invalid.
+            local valid = Drag.station_footprint_valid(world, tx, ty) and Drag.station_affordable(world)
+            preview = { tiles = Drag.station_footprint(tx, ty), color = C.COLOR.BUILD_STATION, valid = valid }
+            drag_cost = Drag.station_cost()
         end
         Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
         local msg = (love.timer.getTime() < status_until) and status_msg or nil
@@ -586,6 +595,11 @@ function love.mousepressed(x, y, button)
     end
     if current_tool == C.TOOL.MINE then
         Tools.apply(C.TOOL.MINE, world, tx, ty)
+        mark_dirty()
+        return
+    end
+    if current_tool == C.TOOL.FREIGHT_STATION then
+        Tools.apply_station(world, tx, ty)
         mark_dirty()
         return
     end

@@ -23,6 +23,8 @@ local function is_buildable(tile)
         and not tile.power_line
         and not tile.plant
         and not tile.plant_part
+        and not tile.station
+        and not tile.station_part
         and not tile.building
         and tile.zone == C.ZONE.NONE
 end
@@ -74,6 +76,7 @@ function World.new(seed, opts)
         economy   = { last_net = 0 },
         roads     = { connected = {} },
         rails     = { components = {} },
+        freight   = { bridged = {} },
         power     = { topology = {}, powered = {} },
         pollution = { field = {}, dirty = false },
         -- Phase 5: typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
@@ -102,7 +105,8 @@ end
 function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
-    if tile.road or tile.power_line or tile.plant or tile.plant_part then return false end
+    if tile.road or tile.power_line or tile.plant or tile.plant_part
+    or tile.station or tile.station_part then return false end
     if tile.zone == zone then return false end
     tile.zone = zone
     Bus.publish(C.EVENTS.TILE_ZONED, { x = x, y = y, zone = zone })
@@ -130,6 +134,24 @@ function World.bulldoze(world, x, y)
             end
         end
         Bus.publish(C.EVENTS.PLANT_REMOVED, { x = ax, y = ay })
+        return true
+    end
+    if tile.station or tile.station_part then
+        local ax, ay = x, y
+        if tile.station_part then
+            ax, ay = Grid.coord(world.grid, tile.station_part)
+        end
+        local n = C.FREIGHT_STATION.FOOTPRINT
+        for dy = 0, n - 1 do
+            for dx = 0, n - 1 do
+                local t = Grid.get(world.grid, ax + dx, ay + dy)
+                if t then
+                    t.station = nil
+                    t.station_part = nil
+                end
+            end
+        end
+        Bus.publish(C.EVENTS.STATION_REMOVED, { x = ax, y = ay })
         return true
     end
     if tile.mine then
@@ -205,6 +227,33 @@ function World.build_plant(world, x, y)
         end
     end
     Bus.publish(C.EVENTS.PLANT_BUILT, { x = x, y = y })
+    return true
+end
+
+-- WRITE: place a 2×2 freight station anchored at (x, y). All footprint tiles
+-- must be plain grass. The anchor holds tile.station; the rest hold
+-- tile.station_part = anchor index (same backlink pattern as power plants).
+function World.build_station(world, x, y)
+    local n = C.FREIGHT_STATION.FOOTPRINT
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            if not is_buildable(Grid.get(world.grid, x + dx, y + dy)) then
+                return false
+            end
+        end
+    end
+    local anchor = Grid.idx(world.grid, x, y)
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            local tile = Grid.get(world.grid, x + dx, y + dy)
+            if dx == 0 and dy == 0 then
+                tile.station = true
+            else
+                tile.station_part = anchor
+            end
+        end
+    end
+    Bus.publish(C.EVENTS.STATION_BUILT, { x = x, y = y })
     return true
 end
 
@@ -308,6 +357,15 @@ function World.mine_count(world)
     local n = 0
     Grid.each(world.grid, function(_, _, tile)
         if tile.mine then n = n + 1 end
+    end)
+    return n
+end
+
+-- READ: number of freight stations (anchor tiles only).
+function World.station_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.station then n = n + 1 end
     end)
     return n
 end

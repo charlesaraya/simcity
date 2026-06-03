@@ -16,6 +16,7 @@ local Roads = require("src.systems.roads")
 local Power = require("src.systems.power")
 local Pollution = require("src.systems.pollution")
 local LandValue = require("src.systems.land_value")
+local Goods = require("src.systems.goods")
 local C = require("src.world.constants")
 
 local Growth = {}
@@ -68,8 +69,13 @@ function Growth.system()
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
                     -- Res/com favour clean, high-value land; industry is indifferent.
                     local lv = land_value_factor(world, x, y, tile.zone)
+                    -- Industrial starts are also gated on raw-materials supply efficiency.
+                    -- When the supply chain is starved the chance collapses toward zero;
+                    -- non-industrial zones are unaffected (factor = 1).
+                    local supply_eff = (tile.zone == C.ZONE.INDUSTRIAL)
+                        and Goods.efficiency(world, C.GOODS.RAW_MATERIALS) or 1
                     if d > 0 and connected and has_power
-                        and RNG.chance(world.rng, d * C.GROWTH.RATE * lv) then
+                        and RNG.chance(world.rng, d * C.GROWTH.RATE * lv * supply_eff) then
                         World.start_building(world, x, y)
                         headroom[cid] = headroom[cid] - draw
                     end

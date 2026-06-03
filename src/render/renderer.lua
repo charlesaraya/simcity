@@ -20,6 +20,7 @@ local OVERLAY_ALPHA = 0.6 -- heatmap drawn translucent so zones/roads show throu
 
 local function tile_color(tile, x, y)
     if tile.plant or tile.plant_part then return C.COLOR.PLANT end
+    if tile.station or tile.station_part then return C.COLOR.BUILD_STATION end
     if tile.power_line then return C.COLOR.POWER_LINE end
     if tile.road then return C.COLOR.ROAD end
     if tile.rail then return C.COLOR.RAIL end
@@ -87,6 +88,17 @@ function Renderer.draw(world, cam, hover, preview, overlay)
             local hh = (C.TILE_H / 2) * BUILD_SCALE
             love.graphics.setColor(C.COLOR.BUILD_MINE)
             love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
+        end
+        -- Station anchor: draw a diamond outline so the anchor tile is distinct
+        -- from its (uniformly colored) part tiles.
+        if tile.station then
+            local cx, cy = Iso.tile_to_screen(x, y)
+            local hw = (C.TILE_W / 2) * BUILD_SCALE
+            local hh = (C.TILE_H / 2) * BUILD_SCALE
+            love.graphics.setColor(1, 1, 1, 0.6)
+            love.graphics.setLineWidth(2)
+            love.graphics.polygon("line", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
+            love.graphics.setLineWidth(1)
         end
     end)
 

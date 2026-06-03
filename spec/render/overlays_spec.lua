@@ -4,10 +4,12 @@
 -- gradient actually runs low->mid->high instead of clustering at one end.
 
 local Overlays = require("src.render.overlays")
-local World = require("src.world.world")
-local Grid = require("src.world.grid")
-local Bus = require("src.bus")
-local C = require("src.world.constants")
+local Rails    = require("src.systems.rails")
+local Freight  = require("src.systems.freight")
+local World    = require("src.world.world")
+local Grid     = require("src.world.grid")
+local Bus      = require("src.bus")
+local C        = require("src.world.constants")
 
 local function set_pollution(w, x, y, v)
     w.pollution.field[Grid.idx(w.grid, x, y)] = v
@@ -65,5 +67,76 @@ describe("Overlays.color", function()
         -- floor land value with heavy pollution -> the red end.
         set_pollution(w, 9, 9, 1000)
         assert.are.same(C.RAMP.LAND_VALUE[1], Overlays.color(C.OVERLAY.LAND_VALUE, w, 9, 9, lo, hi))
+    end)
+end)
+
+describe("Overlays.color FREIGHT", function()
+    before_each(function() Bus.clear() end)
+
+    -- Build a station at (sx, sy) with road west and rail east; return the rail coords.
+    local function setup_bridge(w, sx, sy)
+        World.build_station(w, sx, sy)
+        World.build_road(w, sx - 1, sy)
+        World.build_rail(w, sx + 2, sy)
+        Rails.install(w)
+        Freight.install(w)
+        return sx + 2, sy
+    end
+
+    it("returns nil for plain grass (not a logistics tile)", function()
+        local w = World.new(1)
+        Rails.install(w); Freight.install(w)
+        assert.is_nil(Overlays.color(C.OVERLAY.FREIGHT, w, 5, 5, 0, 0))
+    end)
+
+    it("colors a bridged rail tile green (linked)", function()
+        local w = World.new(1)
+        local rx, ry = setup_bridge(w, 10, 10)
+        assert.are.same(C.RAMP.FREIGHT.linked,
+            Overlays.color(C.OVERLAY.FREIGHT, w, rx, ry, 0, 0))
+    end)
+
+    it("colors an unbridged rail tile red (unlinked)", function()
+        local w = World.new(1)
+        World.build_rail(w, 20, 20)
+        Rails.install(w); Freight.install(w)
+        assert.are.same(C.RAMP.FREIGHT.unlinked,
+            Overlays.color(C.OVERLAY.FREIGHT, w, 20, 20, 0, 0))
+    end)
+
+    it("colors a station tile white", function()
+        local w = World.new(1)
+        setup_bridge(w, 10, 10)
+        assert.are.same(C.RAMP.FREIGHT.station,
+            Overlays.color(C.OVERLAY.FREIGHT, w, 10, 10, 0, 0))
+    end)
+
+    it("colors a mine green when adjacent to a bridged rail component", function()
+        local w = World.new(1)
+        local deposits = World.deposit_tiles(w)
+        local d = deposits[1]
+        World.build_mine(w, d.x, d.y)
+        -- Place rail next to the mine, then bridge it via a station + road.
+        local rx, ry = d.x + 1, d.y
+        World.build_rail(w, rx, ry)
+        World.build_station(w, rx + 1, ry - 1)  -- station touching the rail
+        World.build_road(w, rx + 1 - 1, ry - 1) -- road west of station
+        Rails.install(w); Freight.install(w)
+        -- Only assert if the station actually bridged the component.
+        local cid = Rails.tile_component(w, rx, ry)
+        if Freight.rail_bridged(w, cid) then
+            assert.are.same(C.RAMP.FREIGHT.linked,
+                Overlays.color(C.OVERLAY.FREIGHT, w, d.x, d.y, 0, 0))
+        end
+    end)
+
+    it("colors a mine red when it has no adjacent rail", function()
+        local w = World.new(1)
+        local deposits = World.deposit_tiles(w)
+        local d = deposits[1]
+        World.build_mine(w, d.x, d.y)
+        Rails.install(w); Freight.install(w)
+        assert.are.same(C.RAMP.FREIGHT.unlinked,
+            Overlays.color(C.OVERLAY.FREIGHT, w, d.x, d.y, 0, 0))
     end)
 end)

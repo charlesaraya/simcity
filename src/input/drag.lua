@@ -17,6 +17,8 @@ local function buildable(world, t)
         and not tile.power_line
         and not tile.plant
         and not tile.plant_part
+        and not tile.station
+        and not tile.station_part
         and not tile.building
         and tile.zone == C.ZONE.NONE
 end
@@ -57,7 +59,8 @@ function Drag.zone_rect(world, x0, y0, x1, y1)
             local tile = Grid.get(world.grid, x, y)
             -- Zoning flows around all infrastructure.
             if tile and not tile.road and not tile.power_line
-                and not tile.plant and not tile.plant_part then
+                and not tile.plant and not tile.plant_part
+                and not tile.station and not tile.station_part then
                 tiles[#tiles + 1] = { x = x, y = y }
             end
         end
@@ -74,6 +77,7 @@ function Drag.road_run_valid(world, run)
         if not tile then return false end -- off-grid
         if tile.zone ~= C.ZONE.NONE or tile.building then return false end
         if tile.plant or tile.plant_part then return false end
+        if tile.station or tile.station_part then return false end
     end
     return true
 end
@@ -159,6 +163,54 @@ end
 
 function Drag.rail_affordable(world, run)
     return world.treasury >= Drag.rail_cost(world, run)
+end
+
+-- Station footprint: same 2×2 shape as a power plant.
+local STATION_DIRS = { {0,1},{0,-1},{1,0},{-1,0} }
+
+function Drag.station_footprint(x, y)
+    local n = C.FREIGHT_STATION.FOOTPRINT
+    local tiles = {}
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            tiles[#tiles + 1] = { x = x + dx, y = y + dy }
+        end
+    end
+    return tiles
+end
+
+-- Valid when all footprint tiles are buildable AND the perimeter touches at
+-- least one rail tile AND at least one road tile.
+function Drag.station_footprint_valid(world, x, y)
+    local n = C.FREIGHT_STATION.FOOTPRINT
+    for _, t in ipairs(Drag.station_footprint(x, y)) do
+        if not buildable(world, t) then return false end
+    end
+    local has_rail, has_road = false, false
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            local fx, fy = x + dx, y + dy
+            for _, d in ipairs(STATION_DIRS) do
+                local nx, ny = fx + d[1], fy + d[2]
+                if not (nx >= x and nx < x + n and ny >= y and ny < y + n) then
+                    local t = Grid.get(world.grid, nx, ny)
+                    if t then
+                        if t.rail then has_rail = true end
+                        if t.road then has_road = true end
+                    end
+                end
+            end
+        end
+    end
+    return has_rail and has_road
+end
+
+function Drag.station_cost()
+    return C.FREIGHT_STATION.COST
+end
+
+function Drag.station_affordable(world)
+    return world.treasury >= C.FREIGHT_STATION.COST
 end
 
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in

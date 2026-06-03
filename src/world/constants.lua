@@ -58,6 +58,7 @@ C.COLOR        = {
     IRON_DEPOSIT_A  = { 0.54, 0.36, 0.20 }, -- warm rust-brown
     IRON_DEPOSIT_B  = { 0.48, 0.31, 0.16 }, -- darker rust-brown (checker B)
     BUILD_MINE      = { 0.72, 0.48, 0.25 }, -- bronze; distinguishes mine from zone buildings
+    BUILD_STATION   = { 0.50, 0.38, 0.72 }, -- slate-violet; reads as logistics hub
 
     -- Power network.
     POWER_LINE      = { 0.55, 0.60, 0.78 }, -- steel-blue cable
@@ -128,7 +129,7 @@ C.GROWTH       = {
     ABANDON_THRESHOLD           = -0.5,
     ABANDON_RATE                = 0.1,
     LV_MIN_FACTOR               = 0.25,
-    POLLUTION_ABANDON_THRESHOLD = 40,
+    POLLUTION_ABANDON_THRESHOLD   = 40,
 }
 
 -- Economy tuning.
@@ -140,7 +141,7 @@ C.GROWTH       = {
 C.ECON         = {
     TAX_RATE       = 1,    -- per job, per month
     UPKEEP         = 2,    -- per completed BUSINESS (commerce/industry), per month
-    START_TREASURY = 1500, -- runway to lay roads + a first plant before tax income ramps
+    START_TREASURY = 3000, -- runway to lay roads + a first plant before tax income ramps
 }
 
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
@@ -167,13 +168,21 @@ C.TOOL         = {
     ROAD       = 5,
     POWER_LINE = 6,
     PLANT      = 7,
-    MINE       = 8,
-    RAIL       = 9,
+    MINE              = 8,
+    RAIL              = 9,
+    FREIGHT_STATION   = 10,
 }
 
 -- Freight rail tuning (Phase 5 step 4). No monthly upkeep (like roads).
 C.RAIL         = {
     COST = 15, -- per tile, one-time
+}
+
+-- Freight Station tuning (Phase 5 step 5). 2×2 footprint; must sit adjacent
+-- to BOTH a rail tile and a road tile to count as a logistics bridge.
+C.FREIGHT_STATION = {
+    FOOTPRINT = 2,   -- side length, in tiles (matches plant convention)
+    COST      = 250, -- one-time build cost (mine 200 + station 250 = 450 fits 1500 start)
 }
 
 -- Iron Mine tuning (Phase 5 step 3).
@@ -239,6 +248,7 @@ C.OVERLAY      = {
     POLLUTION  = 1,
     LAND_VALUE = 2,
     POWER      = 3,
+    FREIGHT    = 4, -- rail bridge status (Phase 5 step 7)
 }
 
 -- Heatmap color stops (green -> yellow -> red). Pollution reads high = bad (red);
@@ -248,6 +258,12 @@ C.RAMP         = {
     POLLUTION  = { { 0.25, 0.65, 0.30 }, { 0.90, 0.80, 0.25 }, { 0.80, 0.25, 0.20 } },
     LAND_VALUE = { { 0.80, 0.25, 0.20 }, { 0.90, 0.80, 0.25 }, { 0.25, 0.65, 0.30 } },
     POWER      = { served = { 0.25, 0.65, 0.30 }, unserved = { 0.80, 0.25, 0.20 } },
+    -- Freight overlay: linked = bridged rail/mine, unlinked = isolated, station = hub.
+    FREIGHT    = {
+        linked   = { 0.25, 0.65, 0.30 }, -- green: bridged rail or mine with path
+        unlinked = { 0.80, 0.25, 0.20 }, -- red:   isolated rail or mine without path
+        station  = { 1.00, 1.00, 1.00 }, -- white: freight station footprint
+    },
 }
 
 -- Typed goods flowing through logistics networks (Phase 5).
@@ -261,7 +277,7 @@ C.GOODS        = {
 -- BUFFER_MONTHS: months of demand stored in inventory = 100% efficiency.
 -- MAX_INVENTORY: per-good stockpile cap (prevents infinite buffering).
 C.GOODS_TUNE   = {
-    BUFFER_MONTHS = 3,
+    BUFFER_MONTHS = 2,   -- months of demand = full buffer (2 lets mine fill buffer in 2 months for 1 building)
     MAX_INVENTORY = 500,
 }
 
@@ -298,6 +314,8 @@ C.EVENTS       = {
     MINE_REMOVED         = "mine_removed",
     RAIL_BUILT           = "rail_built",
     RAIL_REMOVED         = "rail_removed",
+    STATION_BUILT        = "station_built",
+    STATION_REMOVED      = "station_removed",
     -- Phase 4c-1: published by World.charter when New Mission populates
     -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
     -- only); Phase 5+ mechanics can subscribe without touching the writer.

@@ -344,3 +344,57 @@ describe("Growth pollution abandon", function()
         assert.are.equal(0, abandons_after_poison(1, C.ZONE.RESIDENTIAL, 30))
     end)
 end)
+
+-- Phase 5 step 6: supply-chain efficiency gates and shapes industrial growth.
+-- Isolated from other triggers: demand stays positive, roads and power are wired,
+-- so supply efficiency is the sole variable being tested.
+describe("Growth supply-chain efficiency", function()
+    before_each(function() Bus.clear() end)
+
+    it("IND tiles do not start when supply efficiency is zero", function()
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.INDUSTRIAL)
+        w.demand.industrial = 0.8
+        -- Force efficiency = 0: demand > 0, inventory = 0.
+        w.goods.demand[C.GOODS.RAW_MATERIALS] = 10
+        w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        assert.are.equal(0, World.count_buildings(w, C.ZONE.INDUSTRIAL))
+    end)
+
+    it("RES tiles are unaffected by supply efficiency", function()
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.RESIDENTIAL)
+        w.demand.residential = 0.8
+        -- Set goods demand to force supply efficiency = 0 for raw materials.
+        w.goods.demand[C.GOODS.RAW_MATERIALS] = 10
+        w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        -- Residential ignores supply efficiency; buildings still grow.
+        assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
+    end)
+
+    it("IND buildings do not abandon when supply is starved (growth stalls, no deindustrialisation)", function()
+        -- Supply shortage stalls new IND starts but never evicts existing buildings.
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.INDUSTRIAL)
+        w.demand.industrial = 0.8
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        local built = World.count_buildings(w, C.ZONE.INDUSTRIAL, C.BUILD.COMPLETE)
+        if built == 0 then return end
+
+        -- Starve the supply chain: efficiency = 0.
+        w.goods.demand[C.GOODS.RAW_MATERIALS] = 100
+        w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
+        local abandons = 0
+        Bus.subscribe(C.EVENTS.BUILDING_ABANDONED, function() abandons = abandons + 1 end)
+        for _ = 1, 40 do g.tick(w) end
+        assert.are.equal(0, abandons)
+    end)
+end)

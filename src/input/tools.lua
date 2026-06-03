@@ -112,4 +112,14 @@ function Tools.apply_plant(world, x, y)
     return World.build_plant(world, x, y)
 end
 
+-- Place a 2×2 freight station anchored at (x, y): footprint must be clear grass,
+-- station must be adjacent to BOTH a rail tile and a road tile, and treasury
+-- must cover the cost.
+function Tools.apply_station(world, x, y)
+    if not (Drag.station_footprint_valid(world, x, y) and Drag.station_affordable(world)) then
+        return false
+    end
+    return World.build_station(world, x, y)
+end
+
 return Tools
