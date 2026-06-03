@@ -81,6 +81,36 @@ describe("Demand", function()
             assert.are.equal(1, cd2)  -- residents flood -> max commercial
             assert.is_true(cd1 >= -1 and id2 >= -1)
         end)
+
+        it("returns zero agricultural demand when there are no residents", function()
+            local _, _, _, ad = Demand.compute(0, 0, 0, 0)
+            assert.are.equal(0, ad)
+        end)
+
+        it("raises agricultural demand when residents outnumber farms", function()
+            -- 10 residents, 0 farms: demand should be positive
+            local _, _, _, ad = Demand.compute(10, 0, 0, 0)
+            assert.is_true(ad > 0)
+        end)
+
+        it("lowers agricultural demand as farms catch up to residents", function()
+            local _, _, _, ad_low  = Demand.compute(10, 0, 0, 0)
+            local _, _, _, ad_high = Demand.compute(10, 0, 0, 4) -- 4 farms serving 10 res
+            assert.is_true(ad_high < ad_low)
+        end)
+
+        it("clamps agricultural demand to [-1, 1]", function()
+            local _, _, _, ad_pos = Demand.compute(1000, 0, 0, 0)
+            local _, _, _, ad_neg = Demand.compute(0,    0, 0, 1000)
+            assert.are.equal( 1, ad_pos)
+            assert.are.equal(-1, ad_neg)
+        end)
+
+        it("defaults agri arg to 0 (back-compat)", function()
+            local _, _, _, ad = Demand.compute(10, 0, 0)
+            local _, _, _, ad2 = Demand.compute(10, 0, 0, 0)
+            assert.are.equal(ad, ad2)
+        end)
     end)
 
     describe("system", function()
@@ -88,7 +118,7 @@ describe("Demand", function()
             assert.are.equal(C.SIM.SECONDS_PER_MONTH, Demand.system().interval)
         end)
 
-        it("writes all three demands into world state from current counts", function()
+        it("writes all four demands into world state from current counts", function()
             local w = World.new(1)
             -- one completed commercial building, no residential, no industrial
             World.zone_tile(w, 1, 1, C.ZONE.COMMERCIAL)
@@ -96,10 +126,11 @@ describe("Demand", function()
             World.complete_building(w, 1, 1)
 
             Demand.system().tick(w)
-            local rd, cd, id = Demand.compute(0, 1, 0)
+            local rd, cd, id, ad = Demand.compute(0, 1, 0, 0)
             assert.are.equal(rd, w.demand.residential)
             assert.are.equal(cd, w.demand.commercial)
             assert.are.equal(id, w.demand.industrial)
+            assert.are.equal(ad, w.demand.agricultural)
         end)
     end)
 end)

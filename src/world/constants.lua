@@ -15,7 +15,7 @@ C.GRID_H       = 64
 C.TILE         = {
     GRASS        = 1,
     IRON_DEPOSIT = 2, -- mineable terrain; Iron Mine can only be placed here
-    RAIL         = 3, -- freight rail track (Phase 5 step 4)
+    RAIL         = 3, -- (reserved; rail is flagged via tile.rail, not tile.type)
 }
 
 -- Menu-screen palette: "archaic-future / dossier-formal" (Foundation/Dune).
@@ -60,6 +60,10 @@ C.COLOR        = {
     BUILD_MINE      = { 0.72, 0.48, 0.25 }, -- bronze; distinguishes mine from zone buildings
     BUILD_STATION   = { 0.50, 0.38, 0.72 }, -- slate-violet; reads as logistics hub
 
+    -- Agricultural zone + farm building marker.
+    ZONE_AGRI    = { 0.32, 0.52, 0.22 }, -- muted field-green zone tint
+    BUILD_FARM   = { 0.65, 0.88, 0.40 }, -- bright crop green (completed farm)
+
     -- Power network.
     POWER_LINE      = { 0.55, 0.60, 0.78 }, -- steel-blue cable
     PLANT           = { 0.48, 0.40, 0.60 }, -- slate-purple, reads as special infra
@@ -80,10 +84,11 @@ C.CAM          = {
 
 -- Zone a tile can hold. NONE = unzoned grass.
 C.ZONE         = {
-    NONE        = 0,
-    RESIDENTIAL = 1,
-    COMMERCIAL  = 2,
-    INDUSTRIAL  = 3,
+    NONE         = 0,
+    RESIDENTIAL  = 1,
+    COMMERCIAL   = 2,
+    INDUSTRIAL   = 3,
+    AGRICULTURAL = 4, -- Phase 6: farming; yield scales with tile.fertility
 }
 
 -- Building lifecycle states.
@@ -107,11 +112,12 @@ C.JOBS_PER_IND = 6 -- factories employ more than shops (first-pass, tunable)
 -- JOB_PULL pulls more than one resident's worth of demand (>1), so the
 --   loop gain exceeds 1: the city grows perpetually, in ratio.
 C.DEMAND       = {
-    BASE_RES    = 0.3,
-    SENS        = 0.1,
-    COM_PER_RES = 0.5,
-    IND_PER_COM = 0.5,
-    JOB_PULL    = 1.5,
+    BASE_RES     = 0.3,
+    SENS         = 0.1,
+    COM_PER_RES  = 0.5,
+    IND_PER_COM  = 0.5,
+    JOB_PULL     = 1.5,
+    FARM_PER_RES = 0.4, -- target farms per resident building; 1 farm feeds ~2-3 homes
 }
 
 -- Growth tuning.
@@ -171,6 +177,7 @@ C.TOOL         = {
     MINE              = 8,
     RAIL              = 9,
     FREIGHT_STATION   = 10,
+    ZONE_AGRI         = 11,
 }
 
 -- Freight rail tuning (Phase 5 step 4). No monthly upkeep (like roads).
@@ -192,6 +199,13 @@ C.IRON_MINE    = {
     PRODUCTION = 4,   -- raw_materials units produced per month
 }
 
+-- Farm tuning (Phase 6).
+C.FARM         = {
+    COST       = 150, -- one-time placement cost (cheaper than mine; road access only)
+    UPKEEP     = 3,   -- monthly maintenance
+    PRODUCTION = 3,   -- food units produced per month per farm tile
+}
+
 -- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep).
 C.ROAD         = {
     COST = 10,
@@ -200,9 +214,10 @@ C.ROAD         = {
 -- One-time cost to zone a tile, charged at zoning.
 -- Housing is cheap to encourage settlement; industry is priciest.
 C.ZONE_COST    = {
-    [C.ZONE.RESIDENTIAL] = 10,
-    [C.ZONE.COMMERCIAL]  = 25,
-    [C.ZONE.INDUSTRIAL]  = 40,
+    [C.ZONE.RESIDENTIAL]  = 10,
+    [C.ZONE.COMMERCIAL]   = 25,
+    [C.ZONE.INDUSTRIAL]   = 40,
+    [C.ZONE.AGRICULTURAL] = 15, -- cheaper than commerce; land is the main cost
 }
 
 -- Power network tuning.
@@ -219,9 +234,10 @@ C.POWER_LINE   = {
 
 -- MW drawn by one completed building of each zone. The zoning mix sizes the grid.
 C.POWER_DRAW   = {
-    [C.ZONE.RESIDENTIAL] = 2,
-    [C.ZONE.COMMERCIAL]  = 3,
-    [C.ZONE.INDUSTRIAL]  = 5,
+    [C.ZONE.RESIDENTIAL]  = 2,
+    [C.ZONE.COMMERCIAL]   = 3,
+    [C.ZONE.INDUSTRIAL]   = 5,
+    [C.ZONE.AGRICULTURAL] = 1, -- irrigation, cold storage: light draw
 }
 
 -- Pollution diffusion (first-pass, tunable). Sources are completed industrial
@@ -270,7 +286,8 @@ C.RAMP         = {
 -- Values are plain integers so they can key tables directly.
 C.GOODS        = {
     RAW_MATERIALS   = 1,
-    PROCESSED_GOODS = 2,
+    PROCESSED_GOODS = 2, -- placeholder; wired in a later phase
+    FOOD            = 3, -- Phase 6: farm output, consumed by residential buildings
 }
 
 -- Goods system tuning.
@@ -287,6 +304,11 @@ C.IND_DEMAND   = {
     [C.GOODS.RAW_MATERIALS] = 2,
 }
 
+-- Food demand per completed residential building per month.
+C.RES_DEMAND   = {
+    [C.GOODS.FOOD] = 1,
+}
+
 -- Iron-deposit seeding at world-gen.
 -- EDGE_PAD:     min tiles from the map edge the deposit centre may land.
 -- CORNER_REACH: max tiles from the corner (bounds the deposit to a corner quadrant).
@@ -295,6 +317,14 @@ C.DEPOSIT      = {
     EDGE_PAD     = 3,
     CORNER_REACH = 14,
     CLUSTER      = 6,
+}
+
+-- Fertility gradient seeded at world-gen.
+-- HOTSPOTS random points drive a distance-falloff field (0..1) on every tile.
+-- The player sees high-fertility areas as better farming locations.
+C.FERTILITY    = {
+    HOTSPOTS = 4,  -- number of fertility peaks
+    RADIUS   = 20, -- tiles; falloff reaches 0 at this distance from a hotspot
 }
 
 -- Event names published by world-state writers (Principle 4).

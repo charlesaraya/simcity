@@ -488,11 +488,11 @@ describe("World", function()
 
     -- Phase 5 step 1: typed goods data layer + iron deposit seeding
     describe("goods", function()
-        it("new() initializes world.goods with empty supply, demand, inventory", function()
+        it("new() initializes world.goods with empty supply/demand and seeded food inventory", function()
             local w = World.new(1)
             assert.are.same({}, w.goods.supply)
             assert.are.same({}, w.goods.demand)
-            assert.are.same({}, w.goods.inventory)
+            assert.are.equal(10, w.goods.inventory[C.GOODS.FOOD])
         end)
     end)
 
@@ -635,6 +635,63 @@ describe("World", function()
             assert.are.equal(1, World.station_count(w))
             World.build_station(w, 20, 20)
             assert.are.equal(2, World.station_count(w))
+        end)
+    end)
+
+    describe("fertility seeding", function()
+        local function tile_at(w, x, y)
+            return w.grid.tiles[w.grid.width * (y - 1) + x]
+        end
+
+        it("every tile has a fertility value after world creation", function()
+            local w = World.new(1)
+            -- Sample a few tiles across the grid.
+            for _, coord in ipairs({{1,1},{32,32},{64,64},{10,50}}) do
+                local t = tile_at(w, coord[1], coord[2])
+                assert.is_not_nil(t.fertility)
+            end
+        end)
+
+        it("fertility values are in [0, 1]", function()
+            local w = World.new(1)
+            for _, coord in ipairs({{1,1},{32,32},{64,64},{20,40},{50,10}}) do
+                local v = tile_at(w, coord[1], coord[2]).fertility
+                assert.is_true(v >= 0 and v <= 1,
+                    "fertility out of range at (" .. coord[1] .. "," .. coord[2] .. "): " .. tostring(v))
+            end
+        end)
+
+        it("at least one tile has fertility > 0 (hotspot seeded)", function()
+            local w = World.new(1)
+            local found = false
+            for y = 1, w.grid.height do
+                for x = 1, w.grid.width do
+                    if tile_at(w, x, y).fertility > 0 then found = true; break end
+                end
+                if found then break end
+            end
+            assert.is_true(found)
+        end)
+
+        it("is seed-deterministic: two worlds with same seed have identical fertility", function()
+            local w1 = World.new(42)
+            local w2 = World.new(42)
+            local t1 = tile_at(w1, 32, 32)
+            local t2 = tile_at(w2, 32, 32)
+            assert.are.equal(t1.fertility, t2.fertility)
+        end)
+
+        it("different seeds produce different fertility maps", function()
+            local w1 = World.new(1)
+            local w2 = World.new(2)
+            -- Check enough tiles that a coincidental match is astronomically unlikely.
+            local same = true
+            for _, c in ipairs({{10,10},{20,20},{30,30},{40,40}}) do
+                if tile_at(w1, c[1], c[2]).fertility ~= tile_at(w2, c[1], c[2]).fertility then
+                    same = false; break
+                end
+            end
+            assert.is_false(same)
         end)
     end)
 

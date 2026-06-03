@@ -43,6 +43,7 @@ local TOOL_NAME = {
     [C.TOOL.ROAD]       = "ROAD",
     [C.TOOL.POWER_LINE] = "POWER LINE",
     [C.TOOL.PLANT]      = "POWER PLANT",
+    [C.TOOL.ZONE_AGRI]        = "AGRICULTURAL",
     [C.TOOL.MINE]             = "IRON MINE",
     [C.TOOL.RAIL]             = "FREIGHT RAIL",
     [C.TOOL.FREIGHT_STATION]  = "FREIGHT STATION",
@@ -137,6 +138,65 @@ function Hud.draw(world, opts)
     love.graphics.setColor(Theme.color("fg"))
     love.graphics.print(tool_line, 20, top_h + 13)
 
+    -- Left toolbar: persistent category list. Submenu expands right when open.
+    local tb_rows = {
+        { key = "1", label = "BULLDOZE",  cat = nil },
+        { key = "2", label = "ZONE",      cat = 2   },
+        { key = "3", label = "NETWORK",   cat = 3   },
+        { key = "4", label = "BUILDINGS", cat = 4   },
+    }
+    local tb_font = love.graphics.getFont()  -- body font set above
+    local tb_label_w = tb_font:getWidth("BUILDINGS")
+    local tb_key_w   = tb_font:getWidth("[4] ")
+    local tb_w = tb_key_w + tb_label_w + 24
+    local tb_item_h = ROW_H + 2
+    local tb_h = #tb_rows * tb_item_h + 8
+    local tb_x = 8
+    local tb_y = top_h + 44
+    strip(tb_x, tb_y, tb_w, tb_h)
+    for i, row in ipairs(tb_rows) do
+        local ry = tb_y + 4 + (i - 1) * tb_item_h
+        local active = opts.menu and opts.menu.cat == row.cat
+        love.graphics.setFont(Theme.font("meta"))
+        love.graphics.setColor(active and Theme.color("amber") or Theme.color("dim_fg"))
+        love.graphics.print("[" .. row.key .. "]", tb_x + 6, ry + 2)
+        love.graphics.setFont(Theme.font("body"))
+        love.graphics.setColor(active and Theme.color("fg") or Theme.color("dim_fg"))
+        love.graphics.print(row.label, tb_x + tb_key_w + 6, ry)
+        if row.cat then
+            love.graphics.setFont(Theme.font("meta"))
+            love.graphics.setColor(active and Theme.color("amber") or Theme.color("dim_fg"))
+            love.graphics.print("▸", tb_x + tb_w - 14, ry + 2)
+        end
+    end
+    -- Submenu: right of toolbar, Y-aligned with the active category row.
+    if opts.menu then
+        local mc = opts.menu.data[opts.menu.cat]
+        if mc then
+            local cat_row = opts.menu.cat  -- cat 2=row2, 3=row3, 4=row4
+            local sub_y = tb_y + 4 + (cat_row - 1) * tb_item_h
+            local sub_x = tb_x + tb_w + 4
+            local mitem_w = 0
+            for _, item in ipairs(mc.items) do
+                local w = tb_font:getWidth(item.label)
+                if w > mitem_w then mitem_w = w end
+            end
+            local mw = mitem_w + tb_key_w + 24
+            local mh = #mc.items * tb_item_h + 8
+            strip(sub_x, sub_y, mw, mh)
+            for i, item in ipairs(mc.items) do
+                local iy = sub_y + 4 + (i - 1) * tb_item_h
+                local focused = (i == opts.menu.idx)
+                love.graphics.setFont(Theme.font("meta"))
+                love.graphics.setColor(focused and Theme.color("amber") or Theme.color("dim_fg"))
+                love.graphics.print("[" .. i .. "]", sub_x + 6, iy + 2)
+                love.graphics.setFont(Theme.font("body"))
+                love.graphics.setColor(focused and Theme.color("fg") or Theme.color("dim_fg"))
+                love.graphics.print(item.label, sub_x + tb_key_w + 6, iy)
+            end
+        end
+    end
+
     -- Monthly budget panel, bottom-left above the key hint.
     local b = Economy.budget(world)
     local panel_h = 7 * ROW_H + 16
@@ -154,16 +214,11 @@ function Hud.draw(world, opts)
     love.graphics.line(PANEL_X + 12, top + 32 + 3 * ROW_H + 2, PANEL_X + PANEL_W - 12, top + 32 + 3 * ROW_H + 2)
     budget_row("MONTH END CASH", money(world.treasury + b.net), top + 32 + 4 * ROW_H + 4)
 
-    -- Logistics panel, bottom-right above the key hint. Shows raw-materials
-    -- supply chain status so the player can diagnose freight bottlenecks.
+    -- Logistics panel: raw-materials (freight chain) + food (farm output) side by side.
     local LOGI_W = 220
     local LOGI_X = W - LOGI_W - PANEL_X
-    local supply  = world.goods.supply[C.GOODS.RAW_MATERIALS]  or 0
-    local demand  = world.goods.demand[C.GOODS.RAW_MATERIALS]  or 0
-    local inv     = world.goods.inventory[C.GOODS.RAW_MATERIALS] or 0
-    local eff_pct = math.floor(Goods.efficiency(world, C.GOODS.RAW_MATERIALS) * 100)
-    local logi_rows = 5  -- header + divider + 4 data rows
-    local logi_h = logi_rows * ROW_H + 16
+    -- 10 row-equivalents: header(32px) + 4 raw + gap + 4 food + padding
+    local logi_h = 10 * ROW_H + 16
     local logi_top = H - 36 - logi_h
     strip(LOGI_X, logi_top, LOGI_W, logi_h)
     love.graphics.setFont(Theme.font("meta"))
@@ -180,22 +235,45 @@ function Hud.draw(world, opts)
         local fnt = love.graphics.getFont()
         love.graphics.print(value, LOGI_X + LOGI_W - fnt:getWidth(value), y - 2)
     end
-    logi_row("RAW SUPPLY",  supply .. "/mo",  logi_top + 32)
-    logi_row("RAW DEMAND",  demand .. "/mo",  logi_top + 32 + ROW_H)
-    logi_row("RAW STOCK",   tostring(inv),    logi_top + 32 + 2 * ROW_H)
-    -- Color efficiency value: green when high, amber when mid, accent when low.
-    local eff_str = eff_pct .. "%"
-    love.graphics.setFont(Theme.font("meta"))
+    local function logi_eff(label, pct, y)
+        local eff_str = pct .. "%"
+        love.graphics.setFont(Theme.font("meta"))
+        love.graphics.setColor(Theme.color("dim_fg"))
+        love.graphics.print(string.upper(label), LOGI_X + 12, y)
+        love.graphics.setFont(Theme.font("body"))
+        local col = pct >= 80 and Theme.color("fg")
+            or pct >= 40 and Theme.color("amber")
+            or Theme.color("accent")
+        love.graphics.setColor(col)
+        local fnt = love.graphics.getFont()
+        love.graphics.print(eff_str, LOGI_X + LOGI_W - fnt:getWidth(eff_str), y - 2)
+    end
+
+    -- Raw-materials rows (freight-gated).
+    local raw_s   = world.goods.supply[C.GOODS.RAW_MATERIALS]    or 0
+    local raw_d   = world.goods.demand[C.GOODS.RAW_MATERIALS]    or 0
+    local raw_inv = world.goods.inventory[C.GOODS.RAW_MATERIALS] or 0
+    local raw_eff = math.floor(Goods.efficiency(world, C.GOODS.RAW_MATERIALS) * 100)
+    logi_row("RAW SUPPLY", raw_s .. "/mo",      logi_top + 32)
+    logi_row("RAW DEMAND", raw_d .. "/mo",      logi_top + 32 + ROW_H)
+    logi_row("RAW STOCK",  tostring(raw_inv),   logi_top + 32 + 2 * ROW_H)
+    logi_eff("RAW EFF",    raw_eff,             logi_top + 32 + 3 * ROW_H)
+
+    -- Divider between sections.
     love.graphics.setColor(Theme.color("dim_fg"))
-    love.graphics.print("EFFICIENCY", LOGI_X + 12, logi_top + 32 + 3 * ROW_H)
-    love.graphics.setFont(Theme.font("body"))
-    local eff_color = eff_pct >= 80 and Theme.color("fg")
-        or eff_pct >= 40 and Theme.color("amber")
-        or Theme.color("accent")
-    love.graphics.setColor(eff_color)
-    local fnt2 = love.graphics.getFont()
-    love.graphics.print(eff_str, LOGI_X + LOGI_W - fnt2:getWidth(eff_str),
-        logi_top + 32 + 3 * ROW_H - 2)
+    love.graphics.line(LOGI_X + 12, logi_top + 32 + 4 * ROW_H + 4,
+                       LOGI_X + LOGI_W - 12, logi_top + 32 + 4 * ROW_H + 4)
+
+    -- Food rows (farm-zone output, fertility-scaled).
+    local food_base = logi_top + 32 + 5 * ROW_H
+    local food_s   = world.goods.supply[C.GOODS.FOOD]    or 0
+    local food_d   = world.goods.demand[C.GOODS.FOOD]    or 0
+    local food_inv = world.goods.inventory[C.GOODS.FOOD] or 0
+    local food_eff = math.floor(Goods.efficiency(world, C.GOODS.FOOD) * 100)
+    logi_row("FOOD SUPPLY", string.format("%.1f/mo", food_s), food_base)
+    logi_row("FOOD DEMAND", food_d .. "/mo",                  food_base + ROW_H)
+    logi_row("FOOD STOCK",  string.format("%.1f", food_inv),  food_base + 2 * ROW_H)
+    logi_eff("FOOD EFF",    food_eff,                         food_base + 3 * ROW_H)
 
     -- Bottom hint strip.
     local hint_h = 24
@@ -203,7 +281,7 @@ function Hud.draw(world, opts)
     love.graphics.setFont(Theme.font("meta"))
     love.graphics.setColor(Theme.color("fg"))
     love.graphics.print(
-        "[1]BULLDOZE  [2]RES  [3]COM  [4]IND  [5]ROAD  [6]LINE  [7]PLANT  [8]MINE  [9]RAIL  [0]STATION  |  DRAG TO BUILD  |  [O]VERLAY  |  SPACE PAUSE  +/- SPEED  |  F5 SAVE  F9 LOAD  |  WASD/SCROLL CAMERA",
+        "↑↓ NAVIGATE  ENTER SELECT  ESC CLOSE  |  DRAG TO BUILD  |  [O]VERLAY  |  SPACE PAUSE  +/- SPEED  |  F5 SAVE  F9 LOAD  |  WASD/SCROLL CAMERA",
         12, H - hint_h + 8)
 end
 

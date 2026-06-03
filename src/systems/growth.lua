@@ -22,9 +22,10 @@ local C = require("src.world.constants")
 local Growth = {}
 
 local function demand_for(world, zone)
-    if zone == C.ZONE.RESIDENTIAL then return world.demand.residential end
-    if zone == C.ZONE.COMMERCIAL then return world.demand.commercial end
-    if zone == C.ZONE.INDUSTRIAL then return world.demand.industrial end
+    if zone == C.ZONE.RESIDENTIAL  then return world.demand.residential  end
+    if zone == C.ZONE.COMMERCIAL   then return world.demand.commercial   end
+    if zone == C.ZONE.INDUSTRIAL   then return world.demand.industrial   end
+    if zone == C.ZONE.AGRICULTURAL then return world.demand.agricultural end
     return 0
 end
 
@@ -58,6 +59,29 @@ function Growth.system()
             local headroom = Power.headroom(world)
             Grid.each(world.grid, function(x, y, tile)
                 if tile.zone == C.ZONE.NONE then return end
+
+                -- Agricultural tiles start as soon as road access exists — no RNG,
+                -- no power gate, no demand check. Road lost mid-season → roll to
+                -- abandon. Complete farms stay productive permanently; no abandonment.
+                if tile.zone == C.ZONE.AGRICULTURAL then
+                    local connected = Roads.building_connected(world, x, y)
+                    if not tile.building then
+                        if connected then World.start_building(world, x, y) end
+                    elseif tile.building.state == C.BUILD.CONSTRUCTING then
+                        if not connected then
+                            if RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
+                                World.abandon_building(world, x, y)
+                            end
+                        else
+                            tile.building.progress = tile.building.progress + 1
+                            if tile.building.progress >= C.GROWTH.CONSTRUCTION_TICKS then
+                                World.complete_building(world, x, y)
+                            end
+                        end
+                    end
+                    return
+                end
+
                 local d = demand_for(world, tile.zone)
                 local connected = Roads.building_connected(world, x, y)
 
@@ -69,11 +93,14 @@ function Growth.system()
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
                     -- Res/com favour clean, high-value land; industry is indifferent.
                     local lv = land_value_factor(world, x, y, tile.zone)
-                    -- Industrial starts are also gated on raw-materials supply efficiency.
-                    -- When the supply chain is starved the chance collapses toward zero;
-                    -- non-industrial zones are unaffected (factor = 1).
+                    -- Industrial starts gate on raw-materials supply efficiency;
+                    -- residential starts gate on food supply efficiency.
+                    -- Starved supply chain collapses start chance toward zero.
                     local supply_eff = (tile.zone == C.ZONE.INDUSTRIAL)
-                        and Goods.efficiency(world, C.GOODS.RAW_MATERIALS) or 1
+                        and Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
+                        or (tile.zone == C.ZONE.RESIDENTIAL)
+                        and Goods.efficiency(world, C.GOODS.FOOD)
+                        or 1
                     if d > 0 and connected and has_power
                         and RNG.chance(world.rng, d * C.GROWTH.RATE * lv * supply_eff) then
                         World.start_building(world, x, y)

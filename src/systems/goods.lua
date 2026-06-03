@@ -63,6 +63,16 @@ function Goods.supply_rate(world)
         rates[C.GOODS.RAW_MATERIALS] =
             (rates[C.GOODS.RAW_MATERIALS] or 0) + C.IRON_MINE.PRODUCTION
     end
+
+    -- Food: completed agricultural buildings produce at a rate scaled by tile fertility.
+    Grid.each(world.grid, function(x, y, tile)
+        if tile.zone == C.ZONE.AGRICULTURAL
+        and tile.building and tile.building.state == C.BUILD.COMPLETE then
+            local yield = C.FARM.PRODUCTION * (tile.fertility or 0)
+            rates[C.GOODS.FOOD] = (rates[C.GOODS.FOOD] or 0) + yield
+        end
+    end)
+
     return rates
 end
 
@@ -71,10 +81,13 @@ end
 function Goods.demand_rate(world)
     local rates = {}
     Grid.each(world.grid, function(_, _, tile)
-        if tile.building
-        and tile.building.state == C.BUILD.COMPLETE
-        and tile.zone == C.ZONE.INDUSTRIAL then
+        if not (tile.building and tile.building.state == C.BUILD.COMPLETE) then return end
+        if tile.zone == C.ZONE.INDUSTRIAL then
             for good, amount in pairs(C.IND_DEMAND) do
+                rates[good] = (rates[good] or 0) + amount
+            end
+        elseif tile.zone == C.ZONE.RESIDENTIAL then
+            for good, amount in pairs(C.RES_DEMAND) do
                 rates[good] = (rates[good] or 0) + amount
             end
         end

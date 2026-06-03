@@ -275,4 +275,46 @@ describe("Economy", function()
             assert.are.equal(before - 2 * C.POWER_LINE.COST, w.treasury)
         end)
     end)
+
+    describe("farm upkeep", function()
+        local function build_agri(w, x, y)
+            World.zone_tile(w, x, y, C.ZONE.AGRICULTURAL)
+            World.start_building(w, x, y)
+            World.complete_building(w, x, y)
+        end
+
+        it("charges farm upkeep in compute", function()
+            assert.are.equal(-C.FARM.UPKEEP, Economy.compute(0, 0, 0, 0, 1))
+            local expected = 10 * C.ECON.TAX_RATE - 2 * C.ECON.UPKEEP - 2 * C.FARM.UPKEEP
+            assert.are.equal(expected, Economy.compute(10, 2, 0, 0, 2))
+        end)
+
+        it("folds farm upkeep into monthly expense in budget", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            local b = Economy.budget(w)
+            assert.are.equal(C.FARM.UPKEEP, b.expense)
+            assert.are.equal(-C.FARM.UPKEEP, b.net)
+        end)
+
+        it("burns monthly upkeep for each completed farm in system tick", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            local expected = Economy.compute(
+                World.jobs(w), World.business_count(w),
+                World.plant_count(w), World.mine_count(w), World.farm_count(w))
+            local before = w.treasury
+            Economy.system().tick(w)
+            assert.are.equal(before + expected, w.treasury)
+            assert.are.equal(before - C.FARM.UPKEEP, w.treasury)
+        end)
+
+        it("debits ZONE_COST[AGRICULTURAL] when an agricultural tile is zoned", function()
+            local w = World.new(1)
+            Economy.install(w)
+            local before = w.treasury
+            World.zone_tile(w, 30, 30, C.ZONE.AGRICULTURAL)
+            assert.are.equal(before - C.ZONE_COST[C.ZONE.AGRICULTURAL], w.treasury)
+        end)
+    end)
 end)

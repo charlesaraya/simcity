@@ -111,10 +111,88 @@ describe("Goods", function()
         end)
     end)
 
+    describe("supply_rate (food)", function()
+        local function build_agri(w, x, y)
+            World.zone_tile(w, x, y, C.ZONE.AGRICULTURAL)
+            World.start_building(w, x, y)
+            World.complete_building(w, x, y)
+        end
+
+        it("returns zero food when no agricultural buildings exist", function()
+            local w = World.new(1)
+            assert.is_nil(Goods.supply_rate(w)[C.GOODS.FOOD])
+        end)
+
+        it("produces food proportional to tile fertility", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            -- Manually set fertility to a known value for exact assertion.
+            local tile = w.grid.tiles[w.grid.width * 29 + 30]
+            tile.fertility = 1.0
+            local s = Goods.supply_rate(w)
+            assert.are.equal(C.FARM.PRODUCTION, s[C.GOODS.FOOD])
+        end)
+
+        it("scales food output with fertility < 1", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            local tile = w.grid.tiles[w.grid.width * 29 + 30]
+            tile.fertility = 0.5
+            local s = Goods.supply_rate(w)
+            local expected = C.FARM.PRODUCTION * 0.5
+            assert.is_true(math.abs(s[C.GOODS.FOOD] - expected) < 0.001)
+        end)
+
+        it("zero fertility farm produces no food", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            local tile = w.grid.tiles[w.grid.width * 29 + 30]
+            tile.fertility = 0
+            local s = Goods.supply_rate(w)
+            assert.are.equal(0, s[C.GOODS.FOOD] or 0)
+        end)
+
+        it("accumulates food across multiple farms", function()
+            local w = World.new(1)
+            build_agri(w, 30, 30)
+            build_agri(w, 31, 30)
+            local t1 = w.grid.tiles[w.grid.width * 29 + 30]
+            local t2 = w.grid.tiles[w.grid.width * 29 + 31]
+            t1.fertility = 1.0
+            t2.fertility = 1.0
+            local s = Goods.supply_rate(w)
+            assert.are.equal(2 * C.FARM.PRODUCTION, s[C.GOODS.FOOD])
+        end)
+    end)
+
     describe("demand_rate", function()
         it("returns empty table for a city with no industrial buildings", function()
             local w = World.new(1)
             assert.are.same({}, Goods.demand_rate(w))
+        end)
+
+        it("returns empty table for a city with no buildings", function()
+            local w = World.new(1)
+            assert.are.same({}, Goods.demand_rate(w))
+        end)
+
+        it("sums FOOD demand across completed residential buildings", function()
+            local w = World.new(1)
+            World.zone_tile(w, 20, 20, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 20, 20)
+            World.complete_building(w, 20, 20)
+            World.zone_tile(w, 21, 20, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 21, 20)
+            World.complete_building(w, 21, 20)
+            local d = Goods.demand_rate(w)
+            assert.are.equal(2 * C.RES_DEMAND[C.GOODS.FOOD], d[C.GOODS.FOOD])
+        end)
+
+        it("ignores under-construction residential buildings", function()
+            local w = World.new(1)
+            World.zone_tile(w, 20, 20, C.ZONE.RESIDENTIAL)
+            World.start_building(w, 20, 20)  -- constructing, not complete
+            assert.is_nil(Goods.demand_rate(w)[C.GOODS.FOOD])
         end)
 
         it("sums RAW_MATERIALS demand across completed IND buildings", function()
@@ -133,7 +211,7 @@ describe("Goods", function()
             assert.are.same({}, Goods.demand_rate(w))
         end)
 
-        it("ignores residential and commercial buildings", function()
+        it("residential buildings demand food; commercial buildings demand nothing", function()
             local w = World.new(1)
             World.zone_tile(w, 20, 20, C.ZONE.RESIDENTIAL)
             World.start_building(w, 20, 20)
@@ -141,7 +219,10 @@ describe("Goods", function()
             World.zone_tile(w, 21, 20, C.ZONE.COMMERCIAL)
             World.start_building(w, 21, 20)
             World.complete_building(w, 21, 20)
-            assert.are.same({}, Goods.demand_rate(w))
+            local d = Goods.demand_rate(w)
+            -- Residential consumes food; commercial contributes nothing.
+            assert.are.equal(C.RES_DEMAND[C.GOODS.FOOD], d[C.GOODS.FOOD])
+            assert.is_nil(d[C.GOODS.RAW_MATERIALS])
         end)
     end)
 

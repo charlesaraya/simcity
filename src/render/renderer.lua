@@ -24,9 +24,10 @@ local function tile_color(tile, x, y)
     if tile.power_line then return C.COLOR.POWER_LINE end
     if tile.road then return C.COLOR.ROAD end
     if tile.rail then return C.COLOR.RAIL end
-    if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.ZONE_RES end
-    if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.ZONE_COM end
-    if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.ZONE_IND end
+    if tile.zone == C.ZONE.RESIDENTIAL  then return C.COLOR.ZONE_RES  end
+    if tile.zone == C.ZONE.COMMERCIAL   then return C.COLOR.ZONE_COM  end
+    if tile.zone == C.ZONE.INDUSTRIAL   then return C.COLOR.ZONE_IND  end
+    if tile.zone == C.ZONE.AGRICULTURAL then return C.COLOR.ZONE_AGRI end
     -- Iron deposit terrain (with or without a mine on top).
     if tile.type == C.TILE.IRON_DEPOSIT then
         return ((x + y) % 2 == 0) and C.COLOR.IRON_DEPOSIT_A or C.COLOR.IRON_DEPOSIT_B
@@ -36,9 +37,10 @@ end
 
 local function building_color(tile)
     if tile.building.state == C.BUILD.CONSTRUCTING then return C.COLOR.BUILD_PENDING end
-    if tile.zone == C.ZONE.RESIDENTIAL then return C.COLOR.BUILD_RES end
-    if tile.zone == C.ZONE.COMMERCIAL then return C.COLOR.BUILD_COM end
-    if tile.zone == C.ZONE.INDUSTRIAL then return C.COLOR.BUILD_IND end
+    if tile.zone == C.ZONE.RESIDENTIAL  then return C.COLOR.BUILD_RES  end
+    if tile.zone == C.ZONE.COMMERCIAL   then return C.COLOR.BUILD_COM  end
+    if tile.zone == C.ZONE.INDUSTRIAL   then return C.COLOR.BUILD_IND  end
+    if tile.zone == C.ZONE.AGRICULTURAL then return C.COLOR.BUILD_FARM end
     return C.COLOR.BUILD_PENDING
 end
 

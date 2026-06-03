@@ -76,33 +76,44 @@ local OVERLAY_CYCLE = {
     [C.OVERLAY.FREIGHT]    = C.OVERLAY.NONE,
 }
 
--- Number keys 1-7 select a tool.
-local TOOL_KEYS = {
-    ["1"] = C.TOOL.BULLDOZE,
-    ["2"] = C.TOOL.ZONE_RES,
-    ["3"] = C.TOOL.ZONE_COM,
-    ["4"] = C.TOOL.ZONE_IND,
-    ["5"] = C.TOOL.ROAD,
-    ["6"] = C.TOOL.POWER_LINE,
-    ["7"] = C.TOOL.PLANT,
-    ["8"] = C.TOOL.MINE,
-    ["9"] = C.TOOL.RAIL,
-    ["0"] = C.TOOL.FREIGHT_STATION,
+-- [1] selects BULLDOZE directly. [2][3][4] open/close category menus;
+-- ↑↓ navigate items, Enter confirms.
+local MENU = {
+    [2] = { name = "ZONE", items = {
+        { label = "RESIDENTIAL",  tool = C.TOOL.ZONE_RES  },
+        { label = "COMMERCIAL",   tool = C.TOOL.ZONE_COM  },
+        { label = "INDUSTRIAL",   tool = C.TOOL.ZONE_IND  },
+        { label = "AGRICULTURAL", tool = C.TOOL.ZONE_AGRI },
+    }},
+    [3] = { name = "NETWORK", items = {
+        { label = "ROAD",         tool = C.TOOL.ROAD       },
+        { label = "POWER LINE",   tool = C.TOOL.POWER_LINE },
+        { label = "FREIGHT RAIL", tool = C.TOOL.RAIL       },
+    }},
+    [4] = { name = "BUILDINGS", items = {
+        { label = "POWER PLANT",     tool = C.TOOL.PLANT           },
+        { label = "IRON MINE",       tool = C.TOOL.MINE            },
+        { label = "FREIGHT STATION", tool = C.TOOL.FREIGHT_STATION },
+    }},
 }
+local menu_cat = nil  -- open category (2/3/4) or nil
+local menu_idx = 1   -- focused item within the open category
 
 -- Tile coords where the current drag began (nil when not dragging). Roads and
 -- zones build on press/drag/release; bulldoze stays hold-to-paint.
 local drag_start = nil
 
 local ZONE_OF = {
-    [C.TOOL.ZONE_RES] = C.ZONE.RESIDENTIAL,
-    [C.TOOL.ZONE_COM] = C.ZONE.COMMERCIAL,
-    [C.TOOL.ZONE_IND] = C.ZONE.INDUSTRIAL,
+    [C.TOOL.ZONE_RES]  = C.ZONE.RESIDENTIAL,
+    [C.TOOL.ZONE_COM]  = C.ZONE.COMMERCIAL,
+    [C.TOOL.ZONE_IND]  = C.ZONE.INDUSTRIAL,
+    [C.TOOL.ZONE_AGRI] = C.ZONE.AGRICULTURAL,
 }
 local ZONE_PREVIEW_COLOR = {
-    [C.ZONE.RESIDENTIAL] = C.COLOR.ZONE_RES,
-    [C.ZONE.COMMERCIAL]  = C.COLOR.ZONE_COM,
-    [C.ZONE.INDUSTRIAL]  = C.COLOR.ZONE_IND,
+    [C.ZONE.RESIDENTIAL]  = C.COLOR.ZONE_RES,
+    [C.ZONE.COMMERCIAL]   = C.COLOR.ZONE_COM,
+    [C.ZONE.INDUSTRIAL]   = C.COLOR.ZONE_IND,
+    [C.ZONE.AGRICULTURAL] = C.COLOR.ZONE_AGRI,
 }
 
 local function is_drag_tool(tool)
@@ -513,7 +524,14 @@ function love.draw()
         end
         Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
         local msg = (love.timer.getTime() < status_until) and status_msg or nil
-        Hud.draw(world, { tool = current_tool, speed = speed, status = msg, drag_cost = drag_cost, overlay = current_overlay })
+        Hud.draw(world, {
+            tool      = current_tool,
+            speed     = speed,
+            status    = msg,
+            drag_cost = drag_cost,
+            overlay   = current_overlay,
+            menu      = menu_cat and { cat = menu_cat, idx = menu_idx, data = MENU } or nil,
+        })
     end
     -- Menu screens + modals draw on top (layered overlay).
     mgr:draw()
@@ -533,18 +551,52 @@ function love.keypressed(key)
     mgr:keypressed(key)
     if not was_in_game then return end
 
-    -- Esc in-game opens the Pause modal. Once it's pushed, the next
-    -- keypressed (incl. another Esc) routes to the modal, not here.
+    -- Esc closes an open menu first; only opens Pause when nothing is open.
     if key == "escape" then
+        if menu_cat then
+            menu_cat = nil
+            return
+        end
         mgr:push_modal("pause_modal")
-        drag_start = nil -- cancel any in-progress drag on pause
+        drag_start = nil
         return
     end
 
-    local tool = TOOL_KEYS[key]
-    if tool then
-        current_tool = tool
-        drag_start = nil -- switching tools cancels any in-progress drag
+    -- When a menu is open, number keys select items directly by index;
+    -- ↑↓ move focus, Enter confirms the focused item.
+    if menu_cat then
+        local items = MENU[menu_cat].items
+        local n = tonumber(key)
+        if n and n >= 1 and n <= #items then
+            current_tool = items[n].tool
+            menu_cat = nil
+            drag_start = nil
+            return
+        end
+        if key == "up" then
+            menu_idx = math.max(1, menu_idx - 1)
+            return
+        elseif key == "down" then
+            menu_idx = math.min(#items, menu_idx + 1)
+            return
+        elseif key == "return" then
+            current_tool = items[menu_idx].tool
+            menu_cat = nil
+            drag_start = nil
+            return
+        end
+    end
+    -- No menu open: [1] = direct bulldoze, [2][3][4] toggle category.
+    if key == "1" then
+        current_tool = C.TOOL.BULLDOZE
+        drag_start = nil
+        return
+    end
+    local cat = tonumber(key)
+    if cat and MENU[cat] then
+        menu_cat = cat
+        menu_idx = 1
+        drag_start = nil
         return
     end
     if key == "o" then

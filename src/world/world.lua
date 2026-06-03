@@ -29,6 +29,34 @@ local function is_buildable(tile)
         and tile.zone == C.ZONE.NONE
 end
 
+-- Seed a continuous fertility gradient (0..1) on every tile using distance
+-- falloff from a set of random hotspots. Higher values = better farm yield.
+-- Called once by World.new(); permanent terrain attribute.
+local function seed_fertility(world)
+    local g    = world.grid
+    local rng  = world.rng
+    local w, h = g.width, g.height
+
+    local function rng_range(lo, hi)
+        return lo + math.floor(RNG.random(rng) * (hi - lo + 1))
+    end
+
+    local hotspots = {}
+    for _ = 1, C.FERTILITY.HOTSPOTS do
+        hotspots[#hotspots + 1] = { x = rng_range(1, w), y = rng_range(1, h) }
+    end
+
+    Grid.each(g, function(x, y, tile)
+        local best = 0
+        for _, hp in ipairs(hotspots) do
+            local dx, dy = x - hp.x, y - hp.y
+            local v = math.max(0, 1 - math.sqrt(dx*dx + dy*dy) / C.FERTILITY.RADIUS)
+            if v > best then best = v end
+        end
+        tile.fertility = best
+    end)
+end
+
 -- Place a cluster of IRON_DEPOSIT tiles in a random corner quadrant.
 -- Called once by World.new(); never called again (deposits are permanent terrain).
 -- The corner is chosen via the world RNG so placement is seed-deterministic.
@@ -70,7 +98,7 @@ function World.new(seed, opts)
     local world = {
         grid      = Grid.new(),
         rng       = RNG.new(seed),
-        demand    = { residential = 0, commercial = 0, industrial = 0 },
+        demand    = { residential = 0, commercial = 0, industrial = 0, agricultural = 0 },
         clock     = { months = 0 },
         treasury  = opts.start_treasury or C.ECON.START_TREASURY,
         economy   = { last_net = 0 },
@@ -80,11 +108,15 @@ function World.new(seed, opts)
         power     = { topology = {}, powered = {} },
         pollution = { field = {}, dirty = false },
         -- Phase 5: typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
-        goods     = { supply = {}, demand = {}, inventory = {} },
+        -- Seed a small food reserve so the first few residents can grow before
+        -- farms are established; raw materials start empty (mine chain required).
+        goods     = { supply = {}, demand = {},
+                      inventory = { [C.GOODS.FOOD] = 10 } },
         crew      = {},
         mission   = {},
     }
     seed_deposits(world)
+    seed_fertility(world)
     return world
 end
 
@@ -380,6 +412,11 @@ function World.deposit_tiles(world)
         end
     end)
     return result
+end
+
+-- READ: number of completed farm buildings (agricultural zone, complete state).
+function World.farm_count(world)
+    return World.count_buildings(world, C.ZONE.AGRICULTURAL, C.BUILD.COMPLETE)
 end
 
 -- READ: number of power plants, counted by anchor tile.
