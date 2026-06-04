@@ -209,9 +209,15 @@ describe("Drag.plant_footprint", function()
     end)
 
     describe("plant_footprint_valid", function()
-        it("is true on open grass", function()
+        it("is true on open grass with an adjacent road", function()
             local w = World.new(1)
+            World.build_road(w, 1, 2) -- adjacent to footprint left side
             assert.is_true(Drag.plant_footprint_valid(w, 2, 2))
+        end)
+
+        it("is false on open grass without an adjacent road", function()
+            local w = World.new(1)
+            assert.is_false(Drag.plant_footprint_valid(w, 2, 2))
         end)
 
         it("is false when the footprint runs off the grid", function()

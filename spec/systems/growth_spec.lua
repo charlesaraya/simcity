@@ -63,6 +63,7 @@ describe("Growth", function()
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.INDUSTRIAL)
         w.demand.industrial = 0.8
+        w.goods.inventory[C.GOODS.RAW_MATERIALS] = 100
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end
         assert.is_true(World.count_buildings(w, C.ZONE.INDUSTRIAL) > 0)
@@ -356,25 +357,24 @@ describe("Growth supply-chain efficiency", function()
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.INDUSTRIAL)
         w.demand.industrial = 0.8
-        -- Force efficiency = 0: demand > 0, inventory = 0.
-        w.goods.demand[C.GOODS.RAW_MATERIALS] = 10
+        -- No supply and no stock: chain completely dry.
+        w.goods.supply[C.GOODS.RAW_MATERIALS] = 0
         w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end
         assert.are.equal(0, World.count_buildings(w, C.ZONE.INDUSTRIAL))
     end)
 
-    it("RES tiles are unaffected by supply efficiency", function()
+    it("RES tiles are unaffected by raw materials availability", function()
         local w = World.new(1)
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.RESIDENTIAL)
         w.demand.residential = 0.8
-        -- Set goods demand to force supply efficiency = 0 for raw materials.
-        w.goods.demand[C.GOODS.RAW_MATERIALS] = 10
+        -- Raw materials chain dry; RES only gates on food (seeded at world init).
+        w.goods.supply[C.GOODS.RAW_MATERIALS] = 0
         w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end
-        -- Residential ignores supply efficiency; buildings still grow.
         assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
     end)
 
@@ -383,21 +383,22 @@ describe("Growth supply-chain efficiency", function()
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.RESIDENTIAL)
         w.demand.residential = 0.8
-        -- Force food efficiency = 0: demand > 0, inventory = 0.
-        w.goods.demand[C.GOODS.FOOD] = 10
+        -- No supply and no stock: food chain completely dry.
+        w.goods.supply[C.GOODS.FOOD] = 0
         w.goods.inventory[C.GOODS.FOOD] = 0
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end
         assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
     end)
 
-    it("IND tiles are unaffected by food efficiency", function()
+    it("IND tiles are unaffected by food availability", function()
         local w = World.new(1)
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.INDUSTRIAL)
         w.demand.industrial = 0.8
-        -- Force food efficiency = 0; IND does not consume food.
-        w.goods.demand[C.GOODS.FOOD] = 10
+        -- Raw materials available (IND gate); food chain dry (should not matter).
+        w.goods.inventory[C.GOODS.RAW_MATERIALS] = 100
+        w.goods.supply[C.GOODS.FOOD] = 0
         w.goods.inventory[C.GOODS.FOOD] = 0
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end
@@ -495,13 +496,13 @@ describe("Growth supply-chain efficiency", function()
         assert.are.equal(0, abandons)
     end)
 
-    it("COM stalls when processed goods inventory is empty", function()
+    it("COM stalls when both processed goods supply and inventory are zero", function()
         local w = World.new(1)
         connect_left_edge(w, 8)
         zone_patch(w, 8, C.ZONE.COMMERCIAL)
         w.demand.commercial = 0.8
-        -- Drain the starting processed goods buffer: force efficiency = 0.
-        w.goods.demand[C.GOODS.PROCESSED_GOODS] = 100
+        -- No IND supply and no stock: chain completely dry.
+        w.goods.supply[C.GOODS.PROCESSED_GOODS] = 0
         w.goods.inventory[C.GOODS.PROCESSED_GOODS] = 0
         local g = Growth.system()
         for _ = 1, 30 do g.tick(w) end

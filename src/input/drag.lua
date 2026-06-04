@@ -20,6 +20,7 @@ local function buildable(world, t)
         and not tile.station
         and not tile.station_part
         and not tile.building
+        and not tile.rail
         and tile.zone == C.ZONE.NONE
 end
 
@@ -68,6 +69,37 @@ function Drag.zone_rect(world, x0, y0, x1, y1)
     return tiles
 end
 
+-- Pure geometry: every tile in the rectangle, no world filtering.
+-- Used for the invalid-rect preview so the full area shows red.
+function Drag.full_rect(x0, y0, x1, y1)
+    local tiles = {}
+    local lx, hx = math.min(x0, x1), math.max(x0, x1)
+    local ly, hy = math.min(y0, y1), math.max(y0, y1)
+    for x = lx, hx do
+        for y = ly, hy do
+            tiles[#tiles + 1] = { x = x, y = y }
+        end
+    end
+    return tiles
+end
+
+-- False when any tile in the rect is a hard obstacle that blocks zoning
+-- for the whole area (mine or iron deposit). Soft infrastructure (roads,
+-- power lines, plants) is NOT a hard obstacle — zoning flows around it.
+function Drag.zone_rect_valid(world, x0, y0, x1, y1)
+    local lx, hx = math.min(x0, x1), math.max(x0, x1)
+    local ly, hy = math.min(y0, y1), math.max(y0, y1)
+    for x = lx, hx do
+        for y = ly, hy do
+            local tile = Grid.get(world.grid, x, y)
+            if tile and (tile.mine or tile.type == C.TILE.IRON_DEPOSIT) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
 -- A road/power-line run is valid unless it leaves the grid or crosses a solid
 -- obstacle. Existing roads and power lines are fine both conduct and are skipped
 -- at build time, so a run flows over them.
@@ -113,12 +145,29 @@ function Drag.plant_footprint(x, y)
     return tiles
 end
 
--- A plant placement is valid only if every footprint tile is on-grid plain grass.
+-- A plant placement is valid only if every footprint tile is on-grid plain grass
+-- AND at least one footprint tile is adjacent to a road.
 function Drag.plant_footprint_valid(world, x, y)
-    for _, t in ipairs(Drag.plant_footprint(x, y)) do
+    local footprint = Drag.plant_footprint(x, y)
+    for _, t in ipairs(footprint) do
         if not buildable(world, t) then return false end
     end
-    return true
+    -- Build a set of footprint coords for fast exclusion.
+    local fp_set = {}
+    for _, t in ipairs(footprint) do
+        fp_set[t.x * 10000 + t.y] = true
+    end
+    local dirs = {{1,0},{-1,0},{0,1},{0,-1}}
+    for _, t in ipairs(footprint) do
+        for _, d in ipairs(dirs) do
+            local nx, ny = t.x + d[1], t.y + d[2]
+            if not fp_set[nx * 10000 + ny] then
+                local ntile = Grid.get(world.grid, nx, ny)
+                if ntile and ntile.road then return true end
+            end
+        end
+    end
+    return false
 end
 
 function Drag.plant_cost()

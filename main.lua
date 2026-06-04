@@ -165,7 +165,7 @@ local function current_drag(cx, cy)
     if current_tool == C.TOOL.ROAD then
         local run = Drag.road_run(sx, sy, cx, cy)
         local valid = Drag.road_run_valid(world, run) and Drag.road_affordable(world, run)
-        return { tiles = run, color = C.COLOR.PREVIEW_ROAD, valid = valid }, Drag.road_cost(world, run)
+        return { tiles = run, color = C.COLOR.ROAD, valid = valid }, Drag.road_cost(world, run)
     end
     if current_tool == C.TOOL.POWER_LINE then
         local run = Drag.road_run(sx, sy, cx, cy)
@@ -179,8 +179,10 @@ local function current_drag(cx, cy)
     end
     local zone = ZONE_OF[current_tool]
     if not zone then return nil end -- tool is not a zone (e.g. changed mid-drag): no preview
-    local tiles = Drag.zone_rect(world, sx, sy, cx, cy)
-    return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = true }, nil
+    local valid = Drag.zone_rect_valid(world, sx, sy, cx, cy)
+    local tiles = valid and Drag.zone_rect(world, sx, sy, cx, cy)
+                        or  Drag.full_rect(sx, sy, cx, cy)
+    return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = valid }, nil
 end
 
 -- Per-call entropy: os.time() advances only once a second, so two New Mission
@@ -520,6 +522,22 @@ function love.draw()
             local valid = Drag.station_footprint_valid(world, tx, ty) and Drag.station_affordable(world)
             preview = { tiles = Drag.station_footprint(tx, ty), color = C.COLOR.BUILD_STATION, valid = valid }
             drag_cost = Drag.station_cost()
+        elseif current_tool == C.TOOL.ROAD and tx then
+            local valid = World.tile_buildable(world, tx, ty)
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.ROAD, valid = valid }
+            drag_cost = valid and C.ROAD.COST or nil
+        elseif current_tool == C.TOOL.POWER_LINE and tx then
+            local valid = World.tile_buildable(world, tx, ty)
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.POWER_LINE, valid = valid }
+            drag_cost = valid and C.POWER_LINE.COST or nil
+        elseif current_tool == C.TOOL.RAIL and tx then
+            local valid = World.tile_rail_buildable(world, tx, ty)
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.RAIL, valid = valid }
+            drag_cost = valid and C.RAIL.COST or nil
+        elseif ZONE_OF[current_tool] and tx then
+            local zone = ZONE_OF[current_tool]
+            local valid = World.tile_buildable(world, tx, ty)
+            preview = { tiles = { { x = tx, y = ty } }, color = ZONE_PREVIEW_COLOR[zone], valid = valid }
         end
         Renderer.draw(world, cam, tx and { x = tx, y = ty } or nil, preview, current_overlay)
         local msg = (love.timer.getTime() < status_until) and status_msg or nil
@@ -672,8 +690,10 @@ function love.mousereleased(x, y, button)
             Tools.apply_line_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         elseif current_tool == C.TOOL.RAIL then
             Tools.apply_rail_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
-        else
-            Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
+        elseif ZONE_OF[current_tool] then
+            if Drag.zone_rect_valid(world, drag_start.x, drag_start.y, cx, cy) then
+                Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))
+            end
         end
         mark_dirty()
     end

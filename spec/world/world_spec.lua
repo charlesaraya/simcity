@@ -375,11 +375,11 @@ describe("World", function()
             assert.is_false(World.build_rail(w, 20, 20))
         end)
 
-        it("succeeds on an IRON_DEPOSIT tile with no mine", function()
+        it("refuses an IRON_DEPOSIT tile even without a mine", function()
             local w = World.new(1)
             local deposits = World.deposit_tiles(w)
             local x, y = deposits[1].x, deposits[1].y
-            assert.is_true(World.build_rail(w, x, y))
+            assert.is_false(World.build_rail(w, x, y))
         end)
 
         it("refuses an IRON_DEPOSIT tile that has a mine", function()

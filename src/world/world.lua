@@ -26,7 +26,10 @@ local function is_buildable(tile)
         and not tile.station
         and not tile.station_part
         and not tile.building
+        and not tile.mine
+        and not tile.rail
         and tile.zone == C.ZONE.NONE
+        and tile.type ~= C.TILE.IRON_DEPOSIT
 end
 
 -- Seed a continuous fertility gradient (0..1) on every tile using distance
@@ -139,7 +142,8 @@ function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
     if tile.road or tile.power_line or tile.plant or tile.plant_part
-    or tile.station or tile.station_part then return false end
+    or tile.station or tile.station_part
+    or tile.mine or tile.type == C.TILE.IRON_DEPOSIT then return false end
     if tile.zone == zone then return false end
     tile.zone = zone
     Bus.publish(C.EVENTS.TILE_ZONED, { x = x, y = y, zone = zone })
@@ -366,6 +370,7 @@ function World.build_rail(world, x, y)
     if tile.road or tile.power_line or tile.plant or tile.plant_part
     or tile.building or tile.mine or tile.rail then return false end
     if tile.zone ~= C.ZONE.NONE then return false end
+    if tile.type == C.TILE.IRON_DEPOSIT then return false end
     tile.rail = true
     Bus.publish(C.EVENTS.RAIL_BUILT, { x = x, y = y })
     return true
@@ -427,6 +432,22 @@ function World.plant_count(world)
         if tile.plant then n = n + 1 end
     end)
     return n
+end
+
+-- Pure read: true when road/power-line/zone can be placed at (x, y).
+function World.tile_buildable(world, x, y)
+    return is_buildable(Grid.get(world.grid, x, y))
+end
+
+-- Pure read: true when a rail tile can be placed at (x, y).
+function World.tile_rail_buildable(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    return tile ~= nil
+        and not tile.road and not tile.power_line and not tile.plant and not tile.plant_part
+        and not tile.building and not tile.mine and not tile.rail
+        and not tile.station and not tile.station_part
+        and tile.zone == C.ZONE.NONE
+        and tile.type ~= C.TILE.IRON_DEPOSIT
 end
 
 return World

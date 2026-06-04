@@ -97,19 +97,23 @@ function Growth.system()
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
                     -- Res/com skip tiles below the land-value floor (too polluted).
                     local lv = land_value_factor(world, x, y, tile.zone)
-                    -- Supply chain gates: IND needs raw materials, RES needs food,
-                    -- COM needs processed goods (IND output).
-                    local supply_eff = (tile.zone == C.ZONE.INDUSTRIAL)
-                        and Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
-                        or (tile.zone == C.ZONE.RESIDENTIAL)
-                        and Goods.efficiency(world, C.GOODS.FOOD)
-                        or (tile.zone == C.ZONE.COMMERCIAL)
-                        and Goods.efficiency(world, C.GOODS.PROCESSED_GOODS)
-                        or 1
+                    -- Supply chain gates: check that the good is actively supplied
+                    -- or in stock. Uses supply+inventory rather than buffer efficiency
+                    -- so a balanced chain (supply == demand, stock == 0) doesn't stall.
+                    local function good_available(good)
+                        return (world.goods.supply[good] or 0)
+                             + (world.goods.inventory[good] or 0) > 0
+                    end
+                    local supply_ok = (tile.zone == C.ZONE.INDUSTRIAL and good_available(C.GOODS.RAW_MATERIALS))
+                        or (tile.zone == C.ZONE.RESIDENTIAL and good_available(C.GOODS.FOOD))
+                        or (tile.zone == C.ZONE.COMMERCIAL  and good_available(C.GOODS.PROCESSED_GOODS))
+                        or (tile.zone ~= C.ZONE.INDUSTRIAL
+                            and tile.zone ~= C.ZONE.RESIDENTIAL
+                            and tile.zone ~= C.ZONE.COMMERCIAL)
                     -- Build cost debited on start; treasury acts as the throttle.
                     local cost = C.BUILD_COST[tile.zone] or 0
                     if d > 0 and connected and has_power
-                        and supply_eff > 0
+                        and supply_ok
                         and lv >= C.GROWTH.LV_MIN_FACTOR
                         and world.treasury >= cost then
                         World.start_building(world, x, y)

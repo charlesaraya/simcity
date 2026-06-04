@@ -183,9 +183,10 @@ describe("Tools", function()
             return box
         end
 
-        it("places a 2x2 plant when affordable and the footprint is clear", function()
+        it("places a 2x2 plant when affordable, footprint clear, and road-adjacent", function()
             local w = World.new(1)
             w.treasury = C.PLANT.COST
+            World.build_road(w, 1, 2) -- adjacent to footprint left side
             local spy = plant_spy()
             assert.is_true(Tools.apply(C.TOOL.PLANT, w, 2, 2))
             assert.is_truthy(tile_at(w, 2, 2).plant)

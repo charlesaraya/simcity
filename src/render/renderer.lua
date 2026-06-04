@@ -104,18 +104,19 @@ function Renderer.draw(world, cam, hover, preview, overlay)
         end
     end)
 
-    if preview then
-        local col = preview.valid and preview.color or C.COLOR.PREVIEW_INVALID
-        love.graphics.setColor(col[1], col[2], col[3], 0.5)
-        for _, t in ipairs(preview.tiles) do
-            love.graphics.polygon("fill", Iso.tile_corners(t.x, t.y))
-        end
-    end
-
     if hover and Grid.in_bounds(world.grid, hover.x, hover.y) then
         local h = C.COLOR.HIGHLIGHT
         love.graphics.setColor(h[1], h[2], h[3], 0.45)
         love.graphics.polygon("fill", Iso.tile_corners(hover.x, hover.y))
+    end
+
+    if preview then
+        local col   = preview.valid and preview.color or C.COLOR.PREVIEW_INVALID
+        local alpha = preview.valid and 0.65 or 0.85
+        love.graphics.setColor(col[1], col[2], col[3], alpha)
+        for _, t in ipairs(preview.tiles) do
+            love.graphics.polygon("fill", Iso.tile_corners(t.x, t.y))
+        end
     end
 
     Camera.clear()
