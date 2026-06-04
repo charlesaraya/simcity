@@ -150,6 +150,7 @@ C.ECON         = {
     TAX_RATE       = 1,    -- per job, per month
     UPKEEP         = 2,    -- per completed BUSINESS (commerce/industry), per month
     START_TREASURY = 3000, -- runway to lay roads + a first plant before tax income ramps
+    DEBT_CEILING   = -10000, -- hard floor: no build that would push treasury below this
 }
 
 -- Simulation time. One "month" is the base tick unit; the clock counts elapsed
@@ -326,18 +327,17 @@ C.RES_DEMAND   = {
 }
 
 -- Hospital tuning (Phase 8). 2×2 footprint; must be road-adjacent.
--- Balance: 1 hospital (4/mo) serves 4 completed RES buildings (4 × 1 = 4/mo).
+-- Balance: 1 hospital (20/mo) serves ~20 RES buildings (20 × 1 = 20/mo).
 C.HOSPITAL     = {
     FOOTPRINT  = 2,   -- side length in tiles
     COST       = 600, -- one-time placement cost
-    PRODUCTION = 4,   -- medicine units produced per month
+    PRODUCTION = 20,  -- medicine units produced per month
 }
 
 -- Medical centre tuning (Phase 8). 1×1 footprint; cheaper early-game option.
--- Balance: 1 centre (1/mo) serves 1 RES building; 4 centres = 1 hospital.
 C.MED_CENTER   = {
     COST       = 150, -- one-time placement cost
-    PRODUCTION = 1,   -- medicine units produced per month
+    PRODUCTION = 4,   -- medicine units produced per month
 }
 
 -- Iron-deposit seeding at world-gen.

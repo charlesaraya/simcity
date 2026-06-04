@@ -157,12 +157,13 @@ describe("Drag road validity + cost", function()
     end)
 
     describe("road_affordable", function()
-        it("is true exactly when the treasury covers the grass-tile cost", function()
+        it("blocks only when the build would push treasury below the debt ceiling", function()
             local w = World.new(1)
             local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
-            w.treasury = 4 * C.ROAD.COST
+            local cost = 4 * C.ROAD.COST
+            w.treasury = C.ECON.DEBT_CEILING + cost
             assert.is_true(Drag.road_affordable(w, run))
-            w.treasury = 4 * C.ROAD.COST - 1
+            w.treasury = C.ECON.DEBT_CEILING + cost - 1
             assert.is_false(Drag.road_affordable(w, run))
         end)
     end)
@@ -185,12 +186,13 @@ describe("Drag power-line cost", function()
         assert.are.equal(2 * C.POWER_LINE.COST, Drag.power_line_cost(w, Drag.road_run(2, 2, 5, 2)))
     end)
 
-    it("power_line_affordable reflects the grass-tile cost", function()
+    it("power_line_affordable blocks only past the debt ceiling", function()
         local w = World.new(1)
         local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
-        w.treasury = 4 * C.POWER_LINE.COST
+        local cost = 4 * C.POWER_LINE.COST
+        w.treasury = C.ECON.DEBT_CEILING + cost
         assert.is_true(Drag.power_line_affordable(w, run))
-        w.treasury = w.treasury - 1
+        w.treasury = C.ECON.DEBT_CEILING + cost - 1
         assert.is_false(Drag.power_line_affordable(w, run))
     end)
 end)
@@ -238,11 +240,11 @@ describe("Drag.plant_footprint", function()
             assert.are.equal(C.PLANT.COST, Drag.plant_cost())
         end)
 
-        it("plant_affordable reflects the treasury against PLANT.COST", function()
+        it("plant_affordable blocks only past the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = C.PLANT.COST
+            w.treasury = C.ECON.DEBT_CEILING + C.PLANT.COST
             assert.is_true(Drag.plant_affordable(w))
-            w.treasury = w.treasury - 1
+            w.treasury = C.ECON.DEBT_CEILING + C.PLANT.COST - 1
             assert.is_false(Drag.plant_affordable(w))
         end)
     end)
@@ -290,11 +292,11 @@ describe("Drag.hospital_footprint", function()
             assert.are.equal(C.HOSPITAL.COST, Drag.hospital_cost())
         end)
 
-        it("hospital_affordable reflects the treasury against HOSPITAL.COST", function()
+        it("hospital_affordable blocks only past the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = C.HOSPITAL.COST
+            w.treasury = C.ECON.DEBT_CEILING + C.HOSPITAL.COST
             assert.is_true(Drag.hospital_affordable(w))
-            w.treasury = w.treasury - 1
+            w.treasury = C.ECON.DEBT_CEILING + C.HOSPITAL.COST - 1
             assert.is_false(Drag.hospital_affordable(w))
         end)
     end)

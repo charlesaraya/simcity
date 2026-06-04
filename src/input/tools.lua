@@ -31,17 +31,15 @@ function Tools.apply(tool, world, x, y)
     elseif tool == C.TOOL.ZONE_IND then
         return World.zone_tile(world, x, y, C.ZONE.INDUSTRIAL)
     elseif tool == C.TOOL.ROAD then
-        -- Affordability gate: command layer refuses to build the road
-        -- if the city can't afford it.
-        if world.treasury < C.ROAD.COST then return false end
+        if world.treasury - C.ROAD.COST < C.ECON.DEBT_CEILING then return false end
         return World.build_road(world, x, y)
     elseif tool == C.TOOL.POWER_LINE then
-        if world.treasury < C.POWER_LINE.COST then return false end
+        if world.treasury - C.POWER_LINE.COST < C.ECON.DEBT_CEILING then return false end
         return World.build_power_line(world, x, y)
     elseif tool == C.TOOL.PLANT then
         return Tools.apply_plant(world, x, y)
     elseif tool == C.TOOL.MINE then
-        if world.treasury < C.IRON_MINE.COST then return false end
+        if world.treasury - C.IRON_MINE.COST < C.ECON.DEBT_CEILING then return false end
         return World.build_mine(world, x, y)
     end
     return false

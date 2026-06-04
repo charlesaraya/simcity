@@ -123,7 +123,7 @@ function Drag.road_cost(world, run)
 end
 
 function Drag.road_affordable(world, run)
-    return world.treasury >= Drag.road_cost(world, run)
+    return world.treasury - Drag.road_cost(world, run) >= C.ECON.DEBT_CEILING
 end
 
 -- Power lines reuse the road run's geometry and validity;
@@ -133,7 +133,7 @@ function Drag.power_line_cost(world, run)
 end
 
 function Drag.power_line_affordable(world, run)
-    return world.treasury >= Drag.power_line_cost(world, run)
+    return world.treasury - Drag.power_line_cost(world, run) >= C.ECON.DEBT_CEILING
 end
 
 -- A power plant's footprint.
@@ -178,7 +178,7 @@ function Drag.plant_cost()
 end
 
 function Drag.plant_affordable(world)
-    return world.treasury >= C.PLANT.COST
+    return world.treasury - C.PLANT.COST >= C.ECON.DEBT_CEILING
 end
 
 -- Rail runs reuse road_run geometry (axis-only straight line). Validity blocks
@@ -214,7 +214,7 @@ function Drag.rail_cost(world, run)
 end
 
 function Drag.rail_affordable(world, run)
-    return world.treasury >= Drag.rail_cost(world, run)
+    return world.treasury - Drag.rail_cost(world, run) >= C.ECON.DEBT_CEILING
 end
 
 -- Station footprint: same 2×2 shape as a power plant.
@@ -262,7 +262,7 @@ function Drag.station_cost()
 end
 
 function Drag.station_affordable(world)
-    return world.treasury >= C.FREIGHT_STATION.COST
+    return world.treasury - C.FREIGHT_STATION.COST >= C.ECON.DEBT_CEILING
 end
 
 -- Hospital footprint: same 2×2 shape as a power plant / freight station.
@@ -305,7 +305,7 @@ function Drag.hospital_cost()
 end
 
 function Drag.hospital_affordable(world)
-    return world.treasury >= C.HOSPITAL.COST
+    return world.treasury - C.HOSPITAL.COST >= C.ECON.DEBT_CEILING
 end
 
 -- Medical centre: 1×1 placement, road-adjacent.
@@ -325,7 +325,7 @@ function Drag.med_center_cost()
 end
 
 function Drag.med_center_affordable(world)
-    return world.treasury >= C.MED_CENTER.COST
+    return world.treasury - C.MED_CENTER.COST >= C.ECON.DEBT_CEILING
 end
 
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in
@@ -343,7 +343,7 @@ function Drag.zone_cost(world, tiles, zone)
 end
 
 function Drag.zone_affordable(world, tiles, zone)
-    return world.treasury >= Drag.zone_cost(world, tiles, zone)
+    return world.treasury - Drag.zone_cost(world, tiles, zone) >= C.ECON.DEBT_CEILING
 end
 
 return Drag

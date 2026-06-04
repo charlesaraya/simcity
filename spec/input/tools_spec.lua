@@ -54,9 +54,9 @@ describe("Tools", function()
             for _, t in ipairs(run) do assert.is_true(tile_at(w, t.x, t.y).road) end
         end)
 
-        it("apply_run builds nothing when unaffordable", function()
+        it("apply_run builds nothing when below the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = 3 * C.ROAD.COST -- need 4
+            w.treasury = C.ECON.DEBT_CEILING + 4 * C.ROAD.COST - 1
             local run = Drag.road_run(2, 2, 5, 2)
             assert.is_false(Tools.apply_run(w, run))
             for _, t in ipairs(run) do assert.is_nil(tile_at(w, t.x, t.y).road) end
@@ -86,9 +86,9 @@ describe("Tools", function()
             for _, t in ipairs(run) do assert.is_true(tile_at(w, t.x, t.y).power_line) end
         end)
 
-        it("apply_line_run lays nothing when unaffordable", function()
+        it("apply_line_run lays nothing when below the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = 3 * C.POWER_LINE.COST -- need 4
+            w.treasury = C.ECON.DEBT_CEILING + 4 * C.POWER_LINE.COST - 1
             local run = Drag.road_run(2, 2, 5, 2)
             assert.is_false(Tools.apply_line_run(w, run))
             for _, t in ipairs(run) do assert.is_nil(tile_at(w, t.x, t.y).power_line) end
@@ -126,9 +126,9 @@ describe("Tools", function()
             assert.are.equal(1, spy.called)
         end)
 
-        it("refuses and lays nothing when the treasury can't afford it", function()
+        it("refuses and lays nothing when below the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = C.ROAD.COST - 1 -- one short
+            w.treasury = C.ECON.DEBT_CEILING + C.ROAD.COST - 1
             local spy = road_spy()
             assert.is_false(Tools.apply(C.TOOL.ROAD, w, 2, 2))
             assert.is_nil(w.grid.tiles[w.grid.width * 1 + 2].road)
@@ -159,9 +159,9 @@ describe("Tools", function()
             assert.are.equal(1, spy.called)
         end)
 
-        it("refuses and lays nothing when the treasury can't afford it", function()
+        it("refuses and lays nothing when below the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = C.POWER_LINE.COST - 1
+            w.treasury = C.ECON.DEBT_CEILING + C.POWER_LINE.COST - 1
             local spy = line_spy()
             assert.is_false(Tools.apply(C.TOOL.POWER_LINE, w, 2, 2))
             assert.is_nil(tile_at(w, 2, 2).power_line)
@@ -229,9 +229,9 @@ describe("Tools", function()
             assert.is_true(w.grid.tiles[w.grid.width * 1 + 2].hospital)
         end)
 
-        it("refuses when unaffordable", function()
+        it("refuses when below the debt ceiling", function()
             local w = World.new(1)
-            w.treasury = C.HOSPITAL.COST - 1
+            w.treasury = C.ECON.DEBT_CEILING + C.HOSPITAL.COST - 1
             World.build_road(w, 1, 2)
             assert.is_false(Tools.apply_hospital(w, 2, 2))
             assert.is_nil(w.grid.tiles[w.grid.width * 1 + 2].hospital)

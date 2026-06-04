@@ -67,7 +67,7 @@ function Growth.system()
                     local connected = Roads.building_connected(world, x, y)
                     if not tile.building then
                         local cost = C.BUILD_COST[C.ZONE.AGRICULTURAL] or 0
-                        if connected and world.treasury >= cost then
+                        if connected and world.treasury - cost >= C.ECON.DEBT_CEILING then
                             World.start_building(world, x, y)
                             world.treasury = world.treasury - cost
                         end
@@ -122,7 +122,7 @@ function Growth.system()
                     if d > 0 and connected and has_power
                         and supply_ok
                         and lv >= C.GROWTH.LV_MIN_FACTOR
-                        and world.treasury >= cost then
+                        and world.treasury - cost >= C.ECON.DEBT_CEILING then
                         World.start_building(world, x, y)
                         world.treasury = world.treasury - cost
                         headroom[cid] = headroom[cid] - draw
