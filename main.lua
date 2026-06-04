@@ -180,8 +180,7 @@ local function current_drag(cx, cy)
     local zone = ZONE_OF[current_tool]
     if not zone then return nil end -- tool is not a zone (e.g. changed mid-drag): no preview
     local tiles = Drag.zone_rect(world, sx, sy, cx, cy)
-    local valid = Drag.zone_affordable(world, tiles, zone)
-    return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = valid }, Drag.zone_cost(world, tiles, zone)
+    return { tiles = tiles, color = ZONE_PREVIEW_COLOR[zone], valid = true }, nil
 end
 
 -- Per-call entropy: os.time() advances only once a second, so two New Mission

@@ -19,23 +19,17 @@ local ZONE_OF = {
     [C.TOOL.ZONE_AGRI] = C.ZONE.AGRICULTURAL,
 }
 
--- Affordability gate for zoning, mirroring the road gate.
-local function zone_with_cost(world, x, y, zone)
-    if world.treasury < C.ZONE_COST[zone] then return false end
-    return World.zone_tile(world, x, y, zone)
-end
-
 -- Apply `tool` to tile (x, y). Returns whatever the underlying writer returns
 -- (true on a real change, false on no-op / out of bounds).
 function Tools.apply(tool, world, x, y)
     if tool == C.TOOL.BULLDOZE then
         return World.bulldoze(world, x, y)
     elseif tool == C.TOOL.ZONE_RES then
-        return zone_with_cost(world, x, y, C.ZONE.RESIDENTIAL)
+        return World.zone_tile(world, x, y, C.ZONE.RESIDENTIAL)
     elseif tool == C.TOOL.ZONE_COM then
-        return zone_with_cost(world, x, y, C.ZONE.COMMERCIAL)
+        return World.zone_tile(world, x, y, C.ZONE.COMMERCIAL)
     elseif tool == C.TOOL.ZONE_IND then
-        return zone_with_cost(world, x, y, C.ZONE.INDUSTRIAL)
+        return World.zone_tile(world, x, y, C.ZONE.INDUSTRIAL)
     elseif tool == C.TOOL.ROAD then
         -- Affordability gate: command layer refuses to build the road
         -- if the city can't afford it.
@@ -79,13 +73,11 @@ function Tools.apply_line_run(world, run)
     return true
 end
 
--- Commit a dragged zone rectangle, all-or-nothing: only if the whole
--- changed-tile cost is affordable. Tiles already in the zone (and roads, already
--- excluded by zone_rect) are no-ops.
+-- Commit a dragged zone rectangle. Zoning is free; cost is charged later when
+-- growth starts each building.
 function Tools.apply_rect(tool, world, tiles)
     local zone = ZONE_OF[tool]
     if not zone then return false end
-    if not Drag.zone_affordable(world, tiles, zone) then return false end
     for _, t in ipairs(tiles) do
         World.zone_tile(world, t.x, t.y, zone)
     end

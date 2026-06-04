@@ -56,9 +56,7 @@ function Economy.install(world)
     Bus.subscribe(C.EVENTS.ROAD_BUILT, function()
         world.treasury = world.treasury - C.ROAD.COST
     end)
-    Bus.subscribe(C.EVENTS.TILE_ZONED, function(data)
-        world.treasury = world.treasury - C.ZONE_COST[data.zone]
-    end)
+
     Bus.subscribe(C.EVENTS.POWER_LINE_BUILT, function()
         world.treasury = world.treasury - C.POWER_LINE.COST
     end)

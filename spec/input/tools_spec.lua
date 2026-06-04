@@ -79,14 +79,6 @@ describe("Tools", function()
             end
         end)
 
-        it("apply_rect zones nothing when unaffordable", function()
-            local w = World.new(1)
-            local tiles = Drag.zone_rect(w, 2, 2, 3, 3) -- 4 tiles
-            w.treasury = 3 * C.ZONE_COST[C.ZONE.RESIDENTIAL]
-            assert.is_false(Tools.apply_rect(C.TOOL.ZONE_RES, w, tiles))
-            assert.are.equal(C.ZONE.NONE, tile_at(w, 2, 2).zone)
-        end)
-
         it("apply_line_run lays the whole power-line run when affordable", function()
             local w = World.new(1)
             local run = Drag.road_run(2, 2, 5, 2) -- 4 grass tiles
@@ -111,35 +103,11 @@ describe("Tools", function()
         end)
     end)
 
-    describe("zoning affordability gate", function()
-        local function zoned_spy()
-            local box = { called = 0 }
-            Bus.subscribe(C.EVENTS.TILE_ZONED, function() box.called = box.called + 1 end)
-            return box
-        end
-
-        it("zones when the treasury can afford the zone cost", function()
-            local w = World.new(1)
-            w.treasury = C.ZONE_COST[C.ZONE.COMMERCIAL] -- exactly enough
-            assert.is_true(Tools.apply(C.TOOL.ZONE_COM, w, 2, 2))
-            assert.are.equal(C.ZONE.COMMERCIAL, w.grid.tiles[w.grid.width * 1 + 2].zone)
-        end)
-
-        it("refuses and zones nothing when it can't afford it", function()
-            local w = World.new(1)
-            w.treasury = C.ZONE_COST[C.ZONE.INDUSTRIAL] - 1
-            local spy = zoned_spy()
-            assert.is_false(Tools.apply(C.TOOL.ZONE_IND, w, 2, 2))
-            assert.are.equal(C.ZONE.NONE, w.grid.tiles[w.grid.width * 1 + 2].zone)
-            assert.are.equal(0, spy.called)
-        end)
-
-        it("does not itself mutate the treasury (the economy debits)", function()
-            local w = World.new(1)
-            w.treasury = 500
-            Tools.apply(C.TOOL.ZONE_RES, w, 2, 2)
-            assert.are.equal(500, w.treasury)
-        end)
+    it("zoning is free: apply does not mutate treasury", function()
+        local w = World.new(1)
+        w.treasury = 500
+        Tools.apply(C.TOOL.ZONE_RES, w, 2, 2)
+        assert.are.equal(500, w.treasury)
     end)
 
     describe("ROAD tool", function()

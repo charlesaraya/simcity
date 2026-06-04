@@ -66,7 +66,11 @@ function Growth.system()
                 if tile.zone == C.ZONE.AGRICULTURAL then
                     local connected = Roads.building_connected(world, x, y)
                     if not tile.building then
-                        if connected then World.start_building(world, x, y) end
+                        local cost = C.BUILD_COST[C.ZONE.AGRICULTURAL] or 0
+                        if connected and world.treasury >= cost then
+                            World.start_building(world, x, y)
+                            world.treasury = world.treasury - cost
+                        end
                     elseif tile.building.state == C.BUILD.CONSTRUCTING then
                         if not connected then
                             if RNG.chance(world.rng, C.GROWTH.ABANDON_RATE) then
@@ -91,19 +95,22 @@ function Growth.system()
                     local cid = Power.component_at(world, x, y)
                     local draw = C.POWER_DRAW[tile.zone] or 0
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
-                    -- Res/com favour clean, high-value land; industry is indifferent.
+                    -- Res/com skip tiles below the land-value floor (too polluted).
                     local lv = land_value_factor(world, x, y, tile.zone)
-                    -- Industrial starts gate on raw-materials supply efficiency;
-                    -- residential starts gate on food supply efficiency.
-                    -- Starved supply chain collapses start chance toward zero.
+                    -- Supply chain gates: IND needs raw materials, RES needs food.
                     local supply_eff = (tile.zone == C.ZONE.INDUSTRIAL)
                         and Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
                         or (tile.zone == C.ZONE.RESIDENTIAL)
                         and Goods.efficiency(world, C.GOODS.FOOD)
                         or 1
+                    -- Build cost debited on start; treasury acts as the throttle.
+                    local cost = C.BUILD_COST[tile.zone] or 0
                     if d > 0 and connected and has_power
-                        and RNG.chance(world.rng, d * C.GROWTH.RATE * lv * supply_eff) then
+                        and supply_eff > 0
+                        and lv >= C.GROWTH.LV_MIN_FACTOR
+                        and world.treasury >= cost then
                         World.start_building(world, x, y)
+                        world.treasury = world.treasury - cost
                         headroom[cid] = headroom[cid] - draw
                     end
                 elseif tile.building.state == C.BUILD.CONSTRUCTING then

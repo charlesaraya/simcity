@@ -121,16 +121,14 @@ C.DEMAND       = {
 }
 
 -- Growth tuning.
--- RATE scales positive demand into a per-month build chance.
+-- Growth is deterministic: demand > 0 + conditions met → start immediately.
 -- CONSTRUCTION_TICKS months to finish.
 -- ABANDON_THRESHOLD: Buildings abandon only when demand drops below this threshold,
 -- at a chance scaled by ABANDON_RATE.
--- LV_MIN_FACTOR floors the land-value bias on res/com starts: even the dirtiest
---   land grows, just slowly (factor ramps LV_MIN_FACTOR..1 with land value).
+-- LV_MIN_FACTOR: res/com skip tiles below this land-value fraction (too polluted).
 -- POLLUTION_ABANDON_THRESHOLD: completed res/com over this pollution level roll to
 --   abandon (the 4th trigger); industry is immune.
 C.GROWTH       = {
-    RATE                        = 0.15,
     CONSTRUCTION_TICKS          = 2,
     ABANDON_THRESHOLD           = -0.5,
     ABANDON_RATE                = 0.1,
@@ -213,11 +211,13 @@ C.ROAD         = {
 
 -- One-time cost to zone a tile, charged at zoning.
 -- Housing is cheap to encourage settlement; industry is priciest.
-C.ZONE_COST    = {
-    [C.ZONE.RESIDENTIAL]  = 10,
-    [C.ZONE.COMMERCIAL]   = 25,
-    [C.ZONE.INDUSTRIAL]   = 40,
-    [C.ZONE.AGRICULTURAL] = 15, -- cheaper than commerce; land is the main cost
+-- One-time cost charged when a building actually starts construction (not on zone).
+-- Zoning itself is free; treasury is debited by the growth system on build start.
+C.BUILD_COST   = {
+    [C.ZONE.RESIDENTIAL]  = 30,
+    [C.ZONE.COMMERCIAL]   = 50,
+    [C.ZONE.INDUSTRIAL]   = 80,
+    [C.ZONE.AGRICULTURAL] = 20,
 }
 
 -- Power network tuning.
