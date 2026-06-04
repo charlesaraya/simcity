@@ -19,6 +19,9 @@ local function buildable(world, t)
         and not tile.plant_part
         and not tile.station
         and not tile.station_part
+        and not tile.hospital
+        and not tile.hospital_part
+        and not tile.med_center
         and not tile.building
         and not tile.rail
         and tile.zone == C.ZONE.NONE
@@ -260,6 +263,69 @@ end
 
 function Drag.station_affordable(world)
     return world.treasury >= C.FREIGHT_STATION.COST
+end
+
+-- Hospital footprint: same 2×2 shape as a power plant / freight station.
+local HOSPITAL_DIRS = { {0,1},{0,-1},{1,0},{-1,0} }
+
+function Drag.hospital_footprint(x, y)
+    local n = C.HOSPITAL.FOOTPRINT
+    local tiles = {}
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            tiles[#tiles + 1] = { x = x + dx, y = y + dy }
+        end
+    end
+    return tiles
+end
+
+-- Valid when all footprint tiles are buildable AND the perimeter touches a road.
+function Drag.hospital_footprint_valid(world, x, y)
+    local n = C.HOSPITAL.FOOTPRINT
+    for _, t in ipairs(Drag.hospital_footprint(x, y)) do
+        if not buildable(world, t) then return false end
+    end
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            local fx, fy = x + dx, y + dy
+            for _, d in ipairs(HOSPITAL_DIRS) do
+                local nx, ny = fx + d[1], fy + d[2]
+                if not (nx >= x and nx < x + n and ny >= y and ny < y + n) then
+                    local t = Grid.get(world.grid, nx, ny)
+                    if t and t.road then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+
+function Drag.hospital_cost()
+    return C.HOSPITAL.COST
+end
+
+function Drag.hospital_affordable(world)
+    return world.treasury >= C.HOSPITAL.COST
+end
+
+-- Medical centre: 1×1 placement, road-adjacent.
+function Drag.med_center_valid(world, x, y)
+    local t = { x = x, y = y }
+    if not buildable(world, t) then return false end
+    local dirs = {{1,0},{-1,0},{0,1},{0,-1}}
+    for _, d in ipairs(dirs) do
+        local nt = Grid.get(world.grid, x + d[1], y + d[2])
+        if nt and nt.road then return true end
+    end
+    return false
+end
+
+function Drag.med_center_cost()
+    return C.MED_CENTER.COST
+end
+
+function Drag.med_center_affordable(world)
+    return world.treasury >= C.MED_CENTER.COST
 end
 
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in

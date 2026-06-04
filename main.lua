@@ -94,6 +94,8 @@ local MENU = {
         { label = "POWER PLANT",     tool = C.TOOL.PLANT           },
         { label = "IRON MINE",       tool = C.TOOL.MINE            },
         { label = "FREIGHT STATION", tool = C.TOOL.FREIGHT_STATION },
+        { label = "MEDICAL CENTRE",  tool = C.TOOL.MED_CENTER      },
+        { label = "HOSPITAL",        tool = C.TOOL.HOSPITAL        },
     }},
 }
 local menu_cat = nil  -- open category (2/3/4) or nil
@@ -522,6 +524,14 @@ function love.draw()
             local valid = Drag.station_footprint_valid(world, tx, ty) and Drag.station_affordable(world)
             preview = { tiles = Drag.station_footprint(tx, ty), color = C.COLOR.BUILD_STATION, valid = valid }
             drag_cost = Drag.station_cost()
+        elseif current_tool == C.TOOL.MED_CENTER and tx then
+            local valid = Drag.med_center_valid(world, tx, ty) and Drag.med_center_affordable(world)
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.MED_CENTER, valid = valid }
+            drag_cost = Drag.med_center_cost()
+        elseif current_tool == C.TOOL.HOSPITAL and tx then
+            local valid = Drag.hospital_footprint_valid(world, tx, ty) and Drag.hospital_affordable(world)
+            preview = { tiles = Drag.hospital_footprint(tx, ty), color = C.COLOR.HOSPITAL, valid = valid }
+            drag_cost = Drag.hospital_cost()
         elseif current_tool == C.TOOL.ROAD and tx then
             local valid = World.tile_buildable(world, tx, ty)
             preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.ROAD, valid = valid }
@@ -669,6 +679,16 @@ function love.mousepressed(x, y, button)
     end
     if current_tool == C.TOOL.FREIGHT_STATION then
         Tools.apply_station(world, tx, ty)
+        mark_dirty()
+        return
+    end
+    if current_tool == C.TOOL.MED_CENTER then
+        Tools.apply_med_center(world, tx, ty)
+        mark_dirty()
+        return
+    end
+    if current_tool == C.TOOL.HOSPITAL then
+        Tools.apply_hospital(world, tx, ty)
         mark_dirty()
         return
     end

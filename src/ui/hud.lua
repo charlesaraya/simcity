@@ -47,6 +47,8 @@ local TOOL_NAME = {
     [C.TOOL.MINE]             = "IRON MINE",
     [C.TOOL.RAIL]             = "FREIGHT RAIL",
     [C.TOOL.FREIGHT_STATION]  = "FREIGHT STATION",
+    [C.TOOL.HOSPITAL]         = "HOSPITAL",
+    [C.TOOL.MED_CENTER]       = "MEDICAL CENTRE",
 }
 
 local OVERLAY_NAME = {
@@ -217,8 +219,8 @@ function Hud.draw(world, opts)
     -- Logistics panel: raw-materials (freight chain) + food (farm output) side by side.
     local LOGI_W = 220
     local LOGI_X = W - LOGI_W - PANEL_X
-    -- 10 row-equivalents: header(32px) + 4 raw + gap + 4 food + padding
-    local logi_h = 10 * ROW_H + 16
+    -- 4 sections × (4 rows + gap) + header(32) + bottom padding.
+    local logi_h = 20 * ROW_H + 40
     local logi_top = H - 36 - logi_h
     strip(LOGI_X, logi_top, LOGI_W, logi_h)
     love.graphics.setFont(Theme.font("meta"))
@@ -290,6 +292,22 @@ function Hud.draw(world, opts)
     logi_row("FOOD DEMAND", food_d .. "/mo",                  food_base + ROW_H)
     logi_row("FOOD STOCK",  string.format("%.1f", food_inv),  food_base + 2 * ROW_H)
     logi_eff("FOOD EFF",    food_eff,                         food_base + 3 * ROW_H)
+
+    -- Divider.
+    love.graphics.setColor(Theme.color("dim_fg"))
+    love.graphics.line(LOGI_X + 12, food_base + 4 * ROW_H + 4,
+                       LOGI_X + LOGI_W - 12, food_base + 4 * ROW_H + 4)
+
+    -- Medicine rows (hospital output → residential demand). HEALTH = MED EFF.
+    local med_base = food_base + 5 * ROW_H
+    local med_s   = world.goods.supply[C.GOODS.MEDICINE]    or 0
+    local med_d   = world.goods.demand[C.GOODS.MEDICINE]    or 0
+    local med_inv = world.goods.inventory[C.GOODS.MEDICINE] or 0
+    local med_eff = math.floor(Goods.efficiency(world, C.GOODS.MEDICINE) * 100)
+    logi_row("MED SUPPLY", string.format("%.1f/mo", med_s), med_base)
+    logi_row("MED DEMAND", med_d .. "/mo",                  med_base + ROW_H)
+    logi_row("MED STOCK",  string.format("%.1f", med_inv),  med_base + 2 * ROW_H)
+    logi_eff("HEALTH",     med_eff,                         med_base + 3 * ROW_H)
 
     -- Bottom hint strip.
     local hint_h = 24

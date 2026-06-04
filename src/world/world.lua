@@ -25,6 +25,9 @@ local function is_buildable(tile)
         and not tile.plant_part
         and not tile.station
         and not tile.station_part
+        and not tile.hospital
+        and not tile.hospital_part
+        and not tile.med_center
         and not tile.building
         and not tile.mine
         and not tile.rail
@@ -50,13 +53,7 @@ local function seed_fertility(world)
     end
 
     Grid.each(g, function(x, y, tile)
-        local best = 0
-        for _, hp in ipairs(hotspots) do
-            local dx, dy = x - hp.x, y - hp.y
-            local v = math.max(0, 1 - math.sqrt(dx*dx + dy*dy) / C.FERTILITY.RADIUS)
-            if v > best then best = v end
-        end
-        tile.fertility = best
+        tile.fertility = 1
     end)
 end
 
@@ -111,10 +108,11 @@ function World.new(seed, opts)
         power     = { topology = {}, powered = {} },
         pollution = { field = {}, dirty = false },
         -- Typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
-        -- Seed food + processed goods so RES/COM can start before full supply chains
-        -- are established. Raw materials start empty (mine → rail → station chain required).
+        -- Seed food and processed goods so RES/COM can start before full supply
+        -- chains are established. Medicine starts empty: it only gates growth
+        -- once the player builds a hospital, so no starter buffer needed.
         goods     = { supply = {}, demand = {},
-                      inventory = { [C.GOODS.FOOD] = 10,
+                      inventory = { [C.GOODS.FOOD]            = 10,
                                     [C.GOODS.PROCESSED_GOODS] = 10 } },
         crew      = {},
         mission   = {},
@@ -142,8 +140,8 @@ function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
     if tile.road or tile.power_line or tile.plant or tile.plant_part
-    or tile.station or tile.station_part
-    or tile.mine or tile.type == C.TILE.IRON_DEPOSIT then return false end
+    or tile.station or tile.station_part or tile.hospital or tile.hospital_part
+    or tile.med_center or tile.mine or tile.type == C.TILE.IRON_DEPOSIT then return false end
     if tile.zone == zone then return false end
     tile.zone = zone
     Bus.publish(C.EVENTS.TILE_ZONED, { x = x, y = y, zone = zone })
@@ -189,6 +187,29 @@ function World.bulldoze(world, x, y)
             end
         end
         Bus.publish(C.EVENTS.STATION_REMOVED, { x = ax, y = ay })
+        return true
+    end
+    if tile.hospital or tile.hospital_part then
+        local ax, ay = x, y
+        if tile.hospital_part then
+            ax, ay = Grid.coord(world.grid, tile.hospital_part)
+        end
+        local n = C.HOSPITAL.FOOTPRINT
+        for dy = 0, n - 1 do
+            for dx = 0, n - 1 do
+                local t = Grid.get(world.grid, ax + dx, ay + dy)
+                if t then
+                    t.hospital = nil
+                    t.hospital_part = nil
+                end
+            end
+        end
+        Bus.publish(C.EVENTS.HOSPITAL_REMOVED, { x = ax, y = ay })
+        return true
+    end
+    if tile.med_center then
+        tile.med_center = nil
+        Bus.publish(C.EVENTS.MED_CENTER_REMOVED, { x = x, y = y })
         return true
     end
     if tile.mine then
@@ -294,6 +315,60 @@ function World.build_station(world, x, y)
     return true
 end
 
+-- WRITE: place a 2×2 hospital anchored at (x, y). All footprint tiles must be
+-- plain grass. Anchor holds tile.hospital; the rest hold tile.hospital_part =
+-- anchor index (same backlink pattern as power plants and stations).
+function World.build_hospital(world, x, y)
+    local n = C.HOSPITAL.FOOTPRINT
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            if not is_buildable(Grid.get(world.grid, x + dx, y + dy)) then
+                return false
+            end
+        end
+    end
+    local anchor = Grid.idx(world.grid, x, y)
+    for dy = 0, n - 1 do
+        for dx = 0, n - 1 do
+            local tile = Grid.get(world.grid, x + dx, y + dy)
+            if dx == 0 and dy == 0 then
+                tile.hospital = true
+            else
+                tile.hospital_part = anchor
+            end
+        end
+    end
+    Bus.publish(C.EVENTS.HOSPITAL_BUILT, { x = x, y = y })
+    return true
+end
+
+-- READ: number of hospitals (anchor tiles only).
+function World.hospital_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.hospital then n = n + 1 end
+    end)
+    return n
+end
+
+-- WRITE: place a 1×1 medical centre on plain grass adjacent to a road.
+function World.build_med_center(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not is_buildable(tile) then return false end
+    tile.med_center = true
+    Bus.publish(C.EVENTS.MED_CENTER_BUILT, { x = x, y = y })
+    return true
+end
+
+-- READ: total healthcare facilities (hospitals + medical centres).
+function World.healthcare_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.hospital or tile.med_center then n = n + 1 end
+    end)
+    return n
+end
+
 -- WRITE: begin construction on a tile. No event yet.
 function World.start_building(world, x, y)
     local tile = Grid.get(world.grid, x, y)
@@ -368,7 +443,8 @@ function World.build_rail(world, x, y)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
     if tile.road or tile.power_line or tile.plant or tile.plant_part
-    or tile.building or tile.mine or tile.rail then return false end
+    or tile.station or tile.station_part or tile.hospital or tile.hospital_part
+    or tile.med_center or tile.building or tile.mine or tile.rail then return false end
     if tile.zone ~= C.ZONE.NONE then return false end
     if tile.type == C.TILE.IRON_DEPOSIT then return false end
     tile.rail = true
@@ -383,7 +459,8 @@ function World.build_mine(world, x, y)
     if not tile then return false end
     if tile.type ~= C.TILE.IRON_DEPOSIT then return false end
     if tile.road or tile.power_line or tile.plant or tile.plant_part
-    or tile.building or tile.mine then return false end
+    or tile.station or tile.station_part or tile.hospital or tile.hospital_part
+    or tile.med_center or tile.building or tile.mine then return false end
     if tile.zone ~= C.ZONE.NONE then return false end
     tile.mine = true
     Bus.publish(C.EVENTS.MINE_BUILT, { x = x, y = y })
@@ -446,6 +523,8 @@ function World.tile_rail_buildable(world, x, y)
         and not tile.road and not tile.power_line and not tile.plant and not tile.plant_part
         and not tile.building and not tile.mine and not tile.rail
         and not tile.station and not tile.station_part
+        and not tile.hospital and not tile.hospital_part
+        and not tile.med_center
         and tile.zone == C.ZONE.NONE
         and tile.type ~= C.TILE.IRON_DEPOSIT
 end

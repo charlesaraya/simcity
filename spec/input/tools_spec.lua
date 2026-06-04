@@ -219,4 +219,36 @@ describe("Tools", function()
             assert.are.equal(500, w.treasury)
         end)
     end)
+
+    describe("HOSPITAL tool", function()
+        it("places a 2x2 hospital when affordable and road-adjacent", function()
+            local w = World.new(1)
+            w.treasury = C.HOSPITAL.COST
+            World.build_road(w, 1, 2)
+            assert.is_true(Tools.apply_hospital(w, 2, 2))
+            assert.is_true(w.grid.tiles[w.grid.width * 1 + 2].hospital)
+        end)
+
+        it("refuses when unaffordable", function()
+            local w = World.new(1)
+            w.treasury = C.HOSPITAL.COST - 1
+            World.build_road(w, 1, 2)
+            assert.is_false(Tools.apply_hospital(w, 2, 2))
+            assert.is_nil(w.grid.tiles[w.grid.width * 1 + 2].hospital)
+        end)
+
+        it("refuses when footprint is blocked", function()
+            local w = World.new(1)
+            w.treasury = C.HOSPITAL.COST
+            World.build_road(w, 1, 2)
+            World.build_road(w, 3, 3) -- blocks a corner of (2,2) footprint
+            assert.is_false(Tools.apply_hospital(w, 2, 2))
+        end)
+
+        it("refuses without road adjacency", function()
+            local w = World.new(1)
+            w.treasury = C.HOSPITAL.COST
+            assert.is_false(Tools.apply_hospital(w, 2, 2))
+        end)
+    end)
 end)

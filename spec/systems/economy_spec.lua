@@ -282,4 +282,15 @@ describe("Economy", function()
         end)
 
     end)
+
+    describe("install (hospital placement debit)", function()
+        it("debits HOSPITAL.COST when a hospital is built", function()
+            local w = World.new(1)
+            Economy.install(w)
+            World.build_road(w, 1, 2)
+            local before = w.treasury -- capture after road debit
+            World.build_hospital(w, 2, 2)
+            assert.are.equal(before - C.HOSPITAL.COST, w.treasury)
+        end)
+    end)
 end)

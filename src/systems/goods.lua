@@ -85,6 +85,17 @@ function Goods.supply_rate(world)
         end
     end)
 
+    -- Medicine: hospitals and medical centres each produce a flat rate.
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.hospital then
+            rates[C.GOODS.MEDICINE] =
+                (rates[C.GOODS.MEDICINE] or 0) + C.HOSPITAL.PRODUCTION
+        elseif tile.med_center then
+            rates[C.GOODS.MEDICINE] =
+                (rates[C.GOODS.MEDICINE] or 0) + C.MED_CENTER.PRODUCTION
+        end
+    end)
+
     return rates
 end
 

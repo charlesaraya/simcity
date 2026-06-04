@@ -115,4 +115,22 @@ function Tools.apply_station(world, x, y)
     return World.build_station(world, x, y)
 end
 
+-- Place a 2×2 hospital anchored at (x, y): footprint must be clear grass,
+-- hospital must be road-adjacent, and treasury must cover the cost.
+function Tools.apply_hospital(world, x, y)
+    if not (Drag.hospital_footprint_valid(world, x, y) and Drag.hospital_affordable(world)) then
+        return false
+    end
+    return World.build_hospital(world, x, y)
+end
+
+-- Place a 1×1 medical centre: tile must be plain grass, road-adjacent,
+-- and treasury must cover the cost.
+function Tools.apply_med_center(world, x, y)
+    if not (Drag.med_center_valid(world, x, y) and Drag.med_center_affordable(world)) then
+        return false
+    end
+    return World.build_med_center(world, x, y)
+end
+
 return Tools

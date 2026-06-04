@@ -104,8 +104,15 @@ function Growth.system()
                         return (world.goods.supply[good] or 0)
                              + (world.goods.inventory[good] or 0) > 0
                     end
+                    -- Medicine only gates once the player has built any healthcare
+                    -- facility (hospital or medical centre). Before that the chain
+                    -- is inactive; after it's built supply must be maintained.
+                    local med_ok = World.healthcare_count(world) == 0
+                               or good_available(C.GOODS.MEDICINE)
                     local supply_ok = (tile.zone == C.ZONE.INDUSTRIAL and good_available(C.GOODS.RAW_MATERIALS))
-                        or (tile.zone == C.ZONE.RESIDENTIAL and good_available(C.GOODS.FOOD))
+                        or (tile.zone == C.ZONE.RESIDENTIAL
+                            and good_available(C.GOODS.FOOD)
+                            and med_ok)
                         or (tile.zone == C.ZONE.COMMERCIAL  and good_available(C.GOODS.PROCESSED_GOODS))
                         or (tile.zone ~= C.ZONE.INDUSTRIAL
                             and tile.zone ~= C.ZONE.RESIDENTIAL

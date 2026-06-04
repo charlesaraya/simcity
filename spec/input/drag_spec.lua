@@ -247,3 +247,55 @@ describe("Drag.plant_footprint", function()
         end)
     end)
 end)
+
+describe("Drag.hospital_footprint", function()
+    it("returns the FOOTPRINT x FOOTPRINT square anchored at (x, y)", function()
+        local function labels(tiles)
+            local out = {}
+            for _, t in ipairs(tiles) do out[#out + 1] = t.x .. "," .. t.y end
+            table.sort(out)
+            return out
+        end
+        assert.are.same({ "2,2", "2,3", "3,2", "3,3" }, labels(Drag.hospital_footprint(2, 2)))
+    end)
+
+    describe("hospital_footprint_valid", function()
+        it("is true on open grass with an adjacent road", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            assert.is_true(Drag.hospital_footprint_valid(w, 2, 2))
+        end)
+
+        it("is false without an adjacent road", function()
+            local w = World.new(1)
+            assert.is_false(Drag.hospital_footprint_valid(w, 2, 2))
+        end)
+
+        it("is false when any footprint tile is occupied", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            World.build_road(w, 3, 3) -- a corner of the (2,2) footprint
+            assert.is_false(Drag.hospital_footprint_valid(w, 2, 2))
+        end)
+
+        it("is false when the footprint runs off the grid", function()
+            local w = World.new(1)
+            assert.is_false(Drag.hospital_footprint_valid(w, w.grid.width, 2))
+            assert.is_false(Drag.hospital_footprint_valid(w, 2, w.grid.height))
+        end)
+    end)
+
+    describe("hospital cost", function()
+        it("is the flat HOSPITAL.COST", function()
+            assert.are.equal(C.HOSPITAL.COST, Drag.hospital_cost())
+        end)
+
+        it("hospital_affordable reflects the treasury against HOSPITAL.COST", function()
+            local w = World.new(1)
+            w.treasury = C.HOSPITAL.COST
+            assert.is_true(Drag.hospital_affordable(w))
+            w.treasury = w.treasury - 1
+            assert.is_false(Drag.hospital_affordable(w))
+        end)
+    end)
+end)

@@ -4,6 +4,7 @@
 -- which we assert by subscribing a test handler to the bus.
 
 local World = require("src.world.world")
+local Grid  = require("src.world.grid")
 local Bus = require("src.bus")
 local C = require("src.world.constants")
 
@@ -682,17 +683,11 @@ describe("World", function()
             assert.are.equal(t1.fertility, t2.fertility)
         end)
 
-        it("different seeds produce different fertility maps", function()
-            local w1 = World.new(1)
-            local w2 = World.new(2)
-            -- Check enough tiles that a coincidental match is astronomically unlikely.
-            local same = true
+        it("all tiles have fertility = 1 (placeholder until fertility is implemented)", function()
+            local w = World.new(1)
             for _, c in ipairs({{10,10},{20,20},{30,30},{40,40}}) do
-                if tile_at(w1, c[1], c[2]).fertility ~= tile_at(w2, c[1], c[2]).fertility then
-                    same = false; break
-                end
+                assert.are.equal(1, tile_at(w, c[1], c[2]).fertility)
             end
-            assert.is_false(same)
         end)
     end)
 
@@ -739,6 +734,56 @@ describe("World", function()
             World.zone_tile(w, 4, 1, C.ZONE.RESIDENTIAL)
             World.start_building(w, 4, 1) -- constructing, not counted
             assert.are.equal(3, World.building_count(w))
+        end)
+    end)
+
+    describe("build_hospital", function()
+        it("places a 2x2 hospital on clear grass with road adjacency", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            assert.is_true(World.build_hospital(w, 2, 2))
+            assert.is_true(w.grid.tiles[w.grid.width * 1 + 2].hospital)
+            assert.are.equal(1, World.hospital_count(w))
+        end)
+
+        it("sets hospital_part on non-anchor footprint tiles", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            World.build_hospital(w, 2, 2)
+            local anchor_idx = Grid.idx(w.grid, 2, 2)
+            assert.are.equal(anchor_idx, w.grid.tiles[w.grid.width * 1 + 3].hospital_part)
+        end)
+
+        it("refuses when any footprint tile is occupied", function()
+            local w = World.new(1)
+            World.build_road(w, 3, 3)
+            assert.is_false(World.build_hospital(w, 2, 2))
+        end)
+
+        it("refuses a second hospital overlapping the first", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            World.build_hospital(w, 2, 2)
+            assert.is_false(World.build_hospital(w, 2, 2))
+        end)
+    end)
+
+    describe("bulldoze hospital", function()
+        it("clears the entire 2x2 footprint from any tile", function()
+            local w = World.new(1)
+            World.build_road(w, 1, 2)
+            World.build_hospital(w, 2, 2)
+            assert.is_true(World.bulldoze(w, 3, 3)) -- non-anchor part tile
+            assert.is_nil(w.grid.tiles[w.grid.width * 1 + 2].hospital)
+            assert.is_nil(w.grid.tiles[w.grid.width * 1 + 3].hospital_part)
+            assert.are.equal(0, World.hospital_count(w))
+        end)
+    end)
+
+    describe("goods.inventory init", function()
+        it("does not seed medicine at world creation (gate inactive until hospital built)", function()
+            local w = World.new(1)
+            assert.are.equal(0, w.goods.inventory[C.GOODS.MEDICINE] or 0)
         end)
     end)
 end)

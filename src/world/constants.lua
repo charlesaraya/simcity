@@ -59,6 +59,10 @@ C.COLOR        = {
     IRON_DEPOSIT_B  = { 0.48, 0.31, 0.16 }, -- darker rust-brown (checker B)
     BUILD_MINE      = { 0.72, 0.48, 0.25 }, -- bronze; distinguishes mine from zone buildings
     BUILD_STATION   = { 0.50, 0.38, 0.72 }, -- slate-violet; reads as logistics hub
+    HOSPITAL        = { 0.20, 0.58, 0.62 }, -- teal tile base for hospital footprint
+    BUILD_HOSPITAL  = { 0.28, 0.78, 0.84 }, -- lighter teal building marker
+    MED_CENTER      = { 0.16, 0.50, 0.54 }, -- darker teal for smaller clinic tile
+    BUILD_MED_CENTER = { 0.22, 0.65, 0.70 }, -- lighter teal clinic marker
 
     -- Agricultural zone + farm building marker.
     ZONE_AGRI    = { 0.32, 0.52, 0.22 }, -- muted field-green zone tint
@@ -176,6 +180,8 @@ C.TOOL         = {
     RAIL              = 9,
     FREIGHT_STATION   = 10,
     ZONE_AGRI         = 11,
+    HOSPITAL          = 12,
+    MED_CENTER        = 13,
 }
 
 -- Freight rail tuning (Phase 5 step 4). No monthly upkeep (like roads).
@@ -284,8 +290,9 @@ C.RAMP         = {
 -- Values are plain integers so they can key tables directly.
 C.GOODS        = {
     RAW_MATERIALS   = 1,
-    PROCESSED_GOODS = 2, -- placeholder; wired in a later phase
-    FOOD            = 3, -- Phase 6: farm output, consumed by residential buildings
+    PROCESSED_GOODS = 2,
+    FOOD            = 3,
+    MEDICINE        = 4, -- Phase 8: hospital output, consumed by residential buildings
 }
 
 -- Goods system tuning.
@@ -312,9 +319,25 @@ C.COM_DEMAND   = {
     [C.GOODS.PROCESSED_GOODS] = 2,
 }
 
--- Food demand per completed residential building per month.
+-- Food + medicine demand per completed residential building per month.
 C.RES_DEMAND   = {
-    [C.GOODS.FOOD] = 1,
+    [C.GOODS.FOOD]     = 1,
+    [C.GOODS.MEDICINE] = 1,
+}
+
+-- Hospital tuning (Phase 8). 2×2 footprint; must be road-adjacent.
+-- Balance: 1 hospital (4/mo) serves 4 completed RES buildings (4 × 1 = 4/mo).
+C.HOSPITAL     = {
+    FOOTPRINT  = 2,   -- side length in tiles
+    COST       = 600, -- one-time placement cost
+    PRODUCTION = 4,   -- medicine units produced per month
+}
+
+-- Medical centre tuning (Phase 8). 1×1 footprint; cheaper early-game option.
+-- Balance: 1 centre (1/mo) serves 1 RES building; 4 centres = 1 hospital.
+C.MED_CENTER   = {
+    COST       = 150, -- one-time placement cost
+    PRODUCTION = 1,   -- medicine units produced per month
 }
 
 -- Iron-deposit seeding at world-gen.
@@ -354,6 +377,10 @@ C.EVENTS       = {
     RAIL_REMOVED         = "rail_removed",
     STATION_BUILT        = "station_built",
     STATION_REMOVED      = "station_removed",
+    HOSPITAL_BUILT       = "hospital_built",
+    HOSPITAL_REMOVED     = "hospital_removed",
+    MED_CENTER_BUILT     = "med_center_built",
+    MED_CENTER_REMOVED   = "med_center_removed",
     -- Phase 4c-1: published by World.charter when New Mission populates
     -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
     -- only); Phase 5+ mechanics can subscribe without touching the writer.

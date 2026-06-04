@@ -540,4 +540,62 @@ describe("Growth supply-chain efficiency", function()
         for _ = 1, 40 do g.tick(w) end
         assert.are.equal(0, abandons)
     end)
+
+    describe("medicine supply gate (Phase 8)", function()
+        it("RES stalls when medicine supply and inventory are zero AND a hospital exists", function()
+            local w = World.new(1)
+            connect_left_edge(w, 8)
+            zone_patch(w, 8, C.ZONE.RESIDENTIAL)
+            w.demand.residential = 0.8
+            -- Simulate a hospital having been built (chain is now active).
+            World.build_road(w, 10, 2)
+            World.build_hospital(w, 11, 2)
+            -- Medicine chain dry.
+            w.goods.supply[C.GOODS.MEDICINE] = 0
+            w.goods.inventory[C.GOODS.MEDICINE] = 0
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.are.equal(0, World.count_buildings(w, C.ZONE.RESIDENTIAL))
+        end)
+
+        it("RES grows freely when no hospital exists (medicine not yet active)", function()
+            local w = World.new(1)
+            connect_left_edge(w, 8)
+            zone_patch(w, 8, C.ZONE.RESIDENTIAL)
+            w.demand.residential = 0.8
+            -- No hospital: medicine gate inactive, food seeded.
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
+        end)
+
+        it("RES grows when hospital exists and medicine is supplied", function()
+            local w = World.new(1)
+            connect_left_edge(w, 8)
+            zone_patch(w, 8, C.ZONE.RESIDENTIAL)
+            w.demand.residential = 0.8
+            World.build_road(w, 10, 2)
+            World.build_hospital(w, 11, 2)
+            w.goods.inventory[C.GOODS.MEDICINE] = 100
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.is_true(World.count_buildings(w, C.ZONE.RESIDENTIAL) > 0)
+        end)
+
+        it("IND tiles are unaffected by medicine availability", function()
+            local w = World.new(1)
+            connect_left_edge(w, 8)
+            zone_patch(w, 8, C.ZONE.INDUSTRIAL)
+            w.demand.industrial = 0.8
+            w.goods.inventory[C.GOODS.RAW_MATERIALS] = 100
+            -- Medicine dry and hospital present: IND should be unaffected.
+            World.build_road(w, 10, 2)
+            World.build_hospital(w, 11, 2)
+            w.goods.supply[C.GOODS.MEDICINE] = 0
+            w.goods.inventory[C.GOODS.MEDICINE] = 0
+            local g = Growth.system()
+            for _ = 1, 30 do g.tick(w) end
+            assert.is_true(World.count_buildings(w, C.ZONE.INDUSTRIAL) > 0)
+        end)
+    end)
 end)
