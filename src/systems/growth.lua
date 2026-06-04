@@ -17,6 +17,7 @@ local Power = require("src.systems.power")
 local Pollution = require("src.systems.pollution")
 local LandValue = require("src.systems.land_value")
 local Goods = require("src.systems.goods")
+local Water = require("src.systems.water")
 local C = require("src.world.constants")
 
 local Growth = {}
@@ -50,9 +51,8 @@ function Growth.system()
             -- same powered snapshot, so a building completing mid-pass can't black
             -- out its neighbours within the same tick.
             Power.resolve(world)
-            -- Rebuild the pollution field once too (only if dirtied since last tick),
-            -- so land-value reads below see a consistent snapshot for the whole pass.
             Pollution.resolve(world)
+            Water.resolve(world)
             -- Spare capacity per component, decremented as we commit new sites this
             -- tick. Growth never starts a building its grid can't power, so the city
             -- plateaus at its supply ceiling instead of overshooting into a blackout.
@@ -117,9 +117,12 @@ function Growth.system()
                         or (tile.zone ~= C.ZONE.INDUSTRIAL
                             and tile.zone ~= C.ZONE.RESIDENTIAL
                             and tile.zone ~= C.ZONE.COMMERCIAL)
+                    -- Water only gates once the player has built any pump.
+                    local has_water = World.pump_count(world) == 0
+                                   or Water.tile_covered(world, x, y)
                     -- Build cost debited on start; treasury acts as the throttle.
                     local cost = C.BUILD_COST[tile.zone] or 0
-                    if d > 0 and connected and has_power
+                    if d > 0 and connected and has_power and has_water
                         and supply_ok
                         and lv >= C.GROWTH.LV_MIN_FACTOR
                         and world.treasury - cost >= C.ECON.DEBT_CEILING then

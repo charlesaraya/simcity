@@ -57,6 +57,7 @@ local OVERLAY_NAME = {
     [C.OVERLAY.LAND_VALUE] = "LAND VALUE",
     [C.OVERLAY.POWER]      = "POWER",
     [C.OVERLAY.FREIGHT]    = "FREIGHT",
+    [C.OVERLAY.WATER]      = "WATER",
 }
 
 local function speed_name(speed)

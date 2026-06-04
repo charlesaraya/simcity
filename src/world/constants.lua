@@ -73,6 +73,10 @@ C.COLOR        = {
     PLANT           = { 0.48, 0.40, 0.60 }, -- slate-purple, reads as special infra
     UNPOWERED       = { 0.95, 0.78, 0.20 }, -- amber dotted outline on dark buildings
 
+    -- Water network.
+    PIPE            = { 0.18, 0.32, 0.55 }, -- dark navy pipe tile
+    BUILD_PUMP      = { 0.30, 0.62, 0.88 }, -- sky-blue pump marker
+
     -- Drag-preview overlays (drawn translucent).
     PREVIEW_ROAD    = { 0.85, 0.78, 0.35 }, -- yellowish shadow
     PREVIEW_INVALID = { 0.85, 0.30, 0.30 }, -- can't build here / can't afford
@@ -183,6 +187,8 @@ C.TOOL         = {
     ZONE_AGRI         = 11,
     HOSPITAL          = 12,
     MED_CENTER        = 13,
+    PIPE              = 14,
+    WATER_PUMP        = 15,
 }
 
 -- Freight rail tuning (Phase 5 step 4). No monthly upkeep (like roads).
@@ -209,6 +215,15 @@ C.FARM         = {
     COST       = 150, -- one-time placement cost (cheaper than mine; road access only)
     UPKEEP     = 3,   -- monthly maintenance
     PRODUCTION = 3,   -- food units produced per month per farm tile
+}
+
+-- Water network tuning.
+C.PIPE         = {
+    COST             = 5,  -- per tile, one-time
+    COVERAGE_RADIUS  = 2,  -- tiles served in each cardinal direction from every pipe tile
+}
+C.WATER_PUMP   = {
+    COST = 300, -- one-time placement cost; pump must adjoin road + power line
 }
 
 -- Road tuning. COST is a one-time charge per tile laid (no recurring upkeep).
@@ -265,11 +280,12 @@ C.LAND         = {
 
 -- Map overlay views.
 C.OVERLAY      = {
-    NONE       = 0, -- normal terrain render.
+    NONE       = 0,
     POLLUTION  = 1,
     LAND_VALUE = 2,
     POWER      = 3,
-    FREIGHT    = 4, -- rail bridge status (Phase 5 step 7)
+    FREIGHT    = 4,
+    WATER      = 5, -- pipe coverage + pump locations
 }
 
 -- Heatmap color stops (green -> yellow -> red). Pollution reads high = bad (red);
@@ -284,6 +300,12 @@ C.RAMP         = {
         linked   = { 0.25, 0.65, 0.30 }, -- green: bridged rail or mine with path
         unlinked = { 0.80, 0.25, 0.20 }, -- red:   isolated rail or mine without path
         station  = { 1.00, 1.00, 1.00 }, -- white: freight station footprint
+    },
+    -- Water overlay: pipe tile = dark, coverage = light blue, pump = bright blue.
+    WATER      = {
+        pipe     = { 0.12, 0.22, 0.42 }, -- dark navy
+        coverage = { 0.40, 0.72, 0.92 }, -- light blue
+        pump     = { 0.30, 0.62, 0.88 }, -- sky blue
     },
 }
 
@@ -381,6 +403,10 @@ C.EVENTS       = {
     HOSPITAL_REMOVED     = "hospital_removed",
     MED_CENTER_BUILT     = "med_center_built",
     MED_CENTER_REMOVED   = "med_center_removed",
+    PIPE_BUILT           = "pipe_built",
+    PIPE_REMOVED         = "pipe_removed",
+    PUMP_BUILT           = "pump_built",
+    PUMP_REMOVED         = "pump_removed",
     -- Phase 4c-1: published by World.charter when New Mission populates
     -- world.mission and world.crew. No system reacts in 4c (the crew is flavor
     -- only); Phase 5+ mechanics can subscribe without touching the writer.

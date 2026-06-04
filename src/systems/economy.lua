@@ -78,6 +78,12 @@ function Economy.install(world)
     Bus.subscribe(C.EVENTS.MED_CENTER_BUILT, function()
         world.treasury = world.treasury - C.MED_CENTER.COST
     end)
+    Bus.subscribe(C.EVENTS.PIPE_BUILT, function()
+        world.treasury = world.treasury - C.PIPE.COST
+    end)
+    Bus.subscribe(C.EVENTS.PUMP_BUILT, function()
+        world.treasury = world.treasury - C.WATER_PUMP.COST
+    end)
 end
 
 return Economy

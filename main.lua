@@ -25,6 +25,7 @@ local Pollution = require("src.systems.pollution")
 local Goods     = require("src.systems.goods")
 local Rails     = require("src.systems.rails")
 local Freight   = require("src.systems.freight")
+local Water     = require("src.systems.water")
 local Tools = require("src.input.tools")
 local Drag = require("src.input.drag")
 local Camera = require("src.render.camera")
@@ -73,7 +74,8 @@ local OVERLAY_CYCLE = {
     [C.OVERLAY.POLLUTION]  = C.OVERLAY.LAND_VALUE,
     [C.OVERLAY.LAND_VALUE] = C.OVERLAY.POWER,
     [C.OVERLAY.POWER]      = C.OVERLAY.FREIGHT,
-    [C.OVERLAY.FREIGHT]    = C.OVERLAY.NONE,
+    [C.OVERLAY.FREIGHT]    = C.OVERLAY.WATER,
+    [C.OVERLAY.WATER]      = C.OVERLAY.NONE,
 }
 
 -- [1] selects BULLDOZE directly. [2][3][4] open/close category menus;
@@ -89,6 +91,8 @@ local MENU = {
         { label = "ROAD",         tool = C.TOOL.ROAD       },
         { label = "POWER LINE",   tool = C.TOOL.POWER_LINE },
         { label = "FREIGHT RAIL", tool = C.TOOL.RAIL       },
+        { label = "WATER PIPE",   tool = C.TOOL.PIPE       },
+        { label = "WATER PUMP",   tool = C.TOOL.WATER_PUMP },
     }},
     [4] = { name = "BUILDINGS", items = {
         { label = "POWER PLANT",     tool = C.TOOL.PLANT           },
@@ -120,7 +124,8 @@ local ZONE_PREVIEW_COLOR = {
 
 local function is_drag_tool(tool)
     return tool == C.TOOL.ROAD or tool == C.TOOL.POWER_LINE
-        or tool == C.TOOL.RAIL or ZONE_OF[tool] ~= nil
+        or tool == C.TOOL.RAIL or tool == C.TOOL.PIPE
+        or ZONE_OF[tool] ~= nil
 end
 
 -- Transient HUD status ("Saved"/"Loaded"), cleared after a short while.
@@ -178,6 +183,11 @@ local function current_drag(cx, cy)
         local run = Drag.road_run(sx, sy, cx, cy)
         local valid = Drag.rail_run_valid(world, run) and Drag.rail_affordable(world, run)
         return { tiles = run, color = C.COLOR.PREVIEW_RAIL, valid = valid }, Drag.rail_cost(world, run)
+    end
+    if current_tool == C.TOOL.PIPE then
+        local run = Drag.road_run(sx, sy, cx, cy)
+        local valid = Drag.pipe_run_valid(world, run) and Drag.pipe_affordable(world, run)
+        return { tiles = run, color = C.COLOR.PIPE, valid = valid }, Drag.pipe_cost(world, run)
     end
     local zone = ZONE_OF[current_tool]
     if not zone then return nil end -- tool is not a zone (e.g. changed mid-drag): no preview
@@ -532,6 +542,10 @@ function love.draw()
             local valid = Drag.hospital_footprint_valid(world, tx, ty) and Drag.hospital_affordable(world)
             preview = { tiles = Drag.hospital_footprint(tx, ty), color = C.COLOR.HOSPITAL, valid = valid }
             drag_cost = Drag.hospital_cost()
+        elseif current_tool == C.TOOL.WATER_PUMP and tx then
+            local valid = Drag.pump_valid(world, tx, ty) and Drag.pump_affordable(world)
+            preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.BUILD_PUMP, valid = valid }
+            drag_cost = Drag.pump_cost()
         elseif current_tool == C.TOOL.ROAD and tx then
             local valid = World.tile_buildable(world, tx, ty)
             preview = { tiles = { { x = tx, y = ty } }, color = C.COLOR.ROAD, valid = valid }
@@ -596,6 +610,9 @@ function love.keypressed(key)
         local n = tonumber(key)
         if n and n >= 1 and n <= #items then
             current_tool = items[n].tool
+            if current_tool == C.TOOL.PIPE or current_tool == C.TOOL.WATER_PUMP then
+                current_overlay = C.OVERLAY.WATER
+            end
             menu_cat = nil
             drag_start = nil
             return
@@ -608,6 +625,9 @@ function love.keypressed(key)
             return
         elseif key == "return" then
             current_tool = items[menu_idx].tool
+            if current_tool == C.TOOL.PIPE or current_tool == C.TOOL.WATER_PUMP then
+                current_overlay = C.OVERLAY.WATER
+            end
             menu_cat = nil
             drag_start = nil
             return
@@ -692,6 +712,11 @@ function love.mousepressed(x, y, button)
         mark_dirty()
         return
     end
+    if current_tool == C.TOOL.WATER_PUMP then
+        Tools.apply_pump(world, tx, ty)
+        mark_dirty()
+        return
+    end
     if is_drag_tool(current_tool) then drag_start = { x = tx, y = ty } end
 end
 
@@ -710,6 +735,8 @@ function love.mousereleased(x, y, button)
             Tools.apply_line_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         elseif current_tool == C.TOOL.RAIL then
             Tools.apply_rail_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
+        elseif current_tool == C.TOOL.PIPE then
+            Tools.apply_pipe_run(world, Drag.road_run(drag_start.x, drag_start.y, cx, cy))
         elseif ZONE_OF[current_tool] then
             if Drag.zone_rect_valid(world, drag_start.x, drag_start.y, cx, cy) then
                 Tools.apply_rect(current_tool, world, Drag.zone_rect(world, drag_start.x, drag_start.y, cx, cy))

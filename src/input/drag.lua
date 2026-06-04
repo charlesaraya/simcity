@@ -15,6 +15,8 @@ local function buildable(world, t)
     return tile
         and not tile.road
         and not tile.power_line
+        and not tile.pipe
+        and not tile.pump
         and not tile.plant
         and not tile.plant_part
         and not tile.station
@@ -326,6 +328,65 @@ end
 
 function Drag.med_center_affordable(world)
     return world.treasury - C.MED_CENTER.COST >= C.ECON.DEBT_CEILING
+end
+
+-- Pipe runs use road_run geometry (axis-only). Pipes can't cross zones,
+-- buildings, or solid infrastructure (plant, station, hospital, mine).
+-- Existing pipe tiles are passed over (no-op at build time, not charged).
+function Drag.pipe_run_valid(world, run)
+    for _, t in ipairs(run) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if not tile then return false end
+        if tile.zone ~= C.ZONE.NONE or tile.building then return false end
+        if tile.plant or tile.plant_part then return false end
+        if tile.station or tile.station_part then return false end
+        if tile.hospital or tile.hospital_part then return false end
+        if tile.mine then return false end
+        if tile.pump then return false end
+    end
+    return true
+end
+
+local function count_pipe_buildable(world, run)
+    local n = 0
+    for _, t in ipairs(run) do
+        local tile = Grid.get(world.grid, t.x, t.y)
+        if tile and not tile.pipe then n = n + 1 end
+    end
+    return n
+end
+
+function Drag.pipe_cost(world, run)
+    return count_pipe_buildable(world, run) * C.PIPE.COST
+end
+
+function Drag.pipe_affordable(world, run)
+    return world.treasury - Drag.pipe_cost(world, run) >= C.ECON.DEBT_CEILING
+end
+
+local PUMP_DIRS = { {1,0}, {-1,0}, {0,1}, {0,-1} }
+
+-- Valid when tile is plain grass AND at least one cardinal neighbor is a road
+-- AND at least one cardinal neighbor is a power line.
+function Drag.pump_valid(world, x, y)
+    if not buildable(world, { x = x, y = y }) then return false end
+    local has_road, has_power_line = false, false
+    for _, d in ipairs(PUMP_DIRS) do
+        local nt = Grid.get(world.grid, x + d[1], y + d[2])
+        if nt then
+            if nt.road        then has_road        = true end
+            if nt.power_line  then has_power_line  = true end
+        end
+    end
+    return has_road and has_power_line
+end
+
+function Drag.pump_cost()
+    return C.WATER_PUMP.COST
+end
+
+function Drag.pump_affordable(world)
+    return world.treasury - C.WATER_PUMP.COST >= C.ECON.DEBT_CEILING
 end
 
 -- Zone cost = ZONE_COST per tile whose zone actually CHANGES. Tiles already in

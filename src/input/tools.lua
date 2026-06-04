@@ -131,4 +131,24 @@ function Tools.apply_med_center(world, x, y)
     return World.build_med_center(world, x, y)
 end
 
+-- Commit a dragged pipe run, all-or-nothing. Validity checks terrain; cost
+-- covers only new tiles (existing pipe tiles are no-ops).
+function Tools.apply_pipe_run(world, run)
+    if not (Drag.pipe_run_valid(world, run) and Drag.pipe_affordable(world, run)) then
+        return false
+    end
+    for _, t in ipairs(run) do
+        World.build_pipe(world, t.x, t.y)
+    end
+    return true
+end
+
+-- Place a 1×1 water pump: must adjoin road + power line, treasury check.
+function Tools.apply_pump(world, x, y)
+    if not (Drag.pump_valid(world, x, y) and Drag.pump_affordable(world)) then
+        return false
+    end
+    return World.build_pump(world, x, y)
+end
+
 return Tools

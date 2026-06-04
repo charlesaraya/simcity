@@ -21,6 +21,8 @@ local function is_buildable(tile)
     return tile ~= nil
         and not tile.road
         and not tile.power_line
+        and not tile.pipe
+        and not tile.pump
         and not tile.plant
         and not tile.plant_part
         and not tile.station
@@ -114,6 +116,7 @@ function World.new(seed, opts)
         goods     = { supply = {}, demand = {},
                       inventory = { [C.GOODS.FOOD]            = 10,
                                     [C.GOODS.PROCESSED_GOODS] = 10 } },
+        water     = { covered = {} },
         crew      = {},
         mission   = {},
     }
@@ -139,7 +142,8 @@ end
 function World.zone_tile(world, x, y, zone)
     local tile = Grid.get(world.grid, x, y)
     if not tile then return false end
-    if tile.road or tile.power_line or tile.plant or tile.plant_part
+    if tile.road or tile.power_line or tile.pipe or tile.pump
+    or tile.plant or tile.plant_part
     or tile.station or tile.station_part or tile.hospital or tile.hospital_part
     or tile.med_center or tile.mine or tile.type == C.TILE.IRON_DEPOSIT then return false end
     if tile.zone == zone then return false end
@@ -222,6 +226,16 @@ function World.bulldoze(world, x, y)
         Bus.publish(C.EVENTS.RAIL_REMOVED, { x = x, y = y })
         return true
     end
+    if tile.pump then
+        tile.pump = nil
+        Bus.publish(C.EVENTS.PUMP_REMOVED, { x = x, y = y })
+        return true
+    end
+    if tile.pipe then
+        tile.pipe = nil
+        Bus.publish(C.EVENTS.PIPE_REMOVED, { x = x, y = y })
+        return true
+    end
     if tile.power_line then
         tile.power_line = nil
         Bus.publish(C.EVENTS.POWER_LINE_REMOVED, { x = x, y = y })
@@ -255,6 +269,25 @@ function World.build_power_line(world, x, y)
     if not is_buildable(tile) then return false end
     tile.power_line = true
     Bus.publish(C.EVENTS.POWER_LINE_BUILT, { x = x, y = y })
+    return true
+end
+
+-- WRITE: lay a water pipe on a tile. Plain grass only (same rule as roads).
+function World.build_pipe(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not is_buildable(tile) then return false end
+    tile.pipe = true
+    Bus.publish(C.EVENTS.PIPE_BUILT, { x = x, y = y })
+    return true
+end
+
+-- WRITE: place a water pump on a plain-grass tile. Validity (road + power-line
+-- adjacency) is enforced by the command layer (drag.lua / tools.lua).
+function World.build_pump(world, x, y)
+    local tile = Grid.get(world.grid, x, y)
+    if not is_buildable(tile) then return false end
+    tile.pump = true
+    Bus.publish(C.EVENTS.PUMP_BUILT, { x = x, y = y })
     return true
 end
 
@@ -365,6 +398,15 @@ function World.healthcare_count(world)
     local n = 0
     Grid.each(world.grid, function(_, _, tile)
         if tile.hospital or tile.med_center then n = n + 1 end
+    end)
+    return n
+end
+
+-- READ: number of water pumps placed.
+function World.pump_count(world)
+    local n = 0
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.pump then n = n + 1 end
     end)
     return n
 end

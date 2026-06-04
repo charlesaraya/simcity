@@ -14,6 +14,7 @@ local LandValue = require("src.systems.land_value")
 local Power = require("src.systems.power")
 local Rails = require("src.systems.rails")
 local Freight = require("src.systems.freight")
+local Water = require("src.systems.water")
 local C = require("src.world.constants")
 
 local Overlays = {}
@@ -29,7 +30,7 @@ function Overlays.range(overlay, world)
     elseif overlay == C.OVERLAY.LAND_VALUE then
         return C.LAND.MIN, C.LAND.MAX
     end
-    return 0, 0
+    return 0, 0  -- WATER, POWER, FREIGHT use discrete colors; range unused
 end
 
 -- The heatmap color {r,g,b} for tile (x, y) under `overlay`, or nil to leave the
@@ -68,6 +69,14 @@ function Overlays.color(overlay, world, x, y, lo, hi)
             local cid = Rails.adjacent_component(world, x, y)
             return Freight.rail_bridged(world, cid)
                 and C.RAMP.FREIGHT.linked or C.RAMP.FREIGHT.unlinked
+        end
+        return nil
+    elseif overlay == C.OVERLAY.WATER then
+        local tile = Grid.get(world.grid, x, y)
+        if tile and tile.pump then return C.RAMP.WATER.pump     end
+        if tile and tile.pipe then return C.RAMP.WATER.pipe     end
+        if Water.tile_covered(world, x, y) then
+            return C.RAMP.WATER.coverage
         end
         return nil
     end

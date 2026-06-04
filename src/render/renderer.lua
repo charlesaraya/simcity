@@ -19,6 +19,8 @@ local BUILD_SCALE = 0.55  -- building diamond size relative to the tile
 local OVERLAY_ALPHA = 0.6 -- heatmap drawn translucent so zones/roads show through
 
 local function tile_color(tile, x, y)
+    if tile.pump then return C.COLOR.PIPE end
+    if tile.pipe then return C.COLOR.PIPE end
     if tile.plant or tile.plant_part then return C.COLOR.PLANT end
     if tile.station or tile.station_part then return C.COLOR.BUILD_STATION end
     if tile.hospital or tile.hospital_part then return C.COLOR.HOSPITAL end
@@ -105,6 +107,14 @@ function Renderer.draw(world, cam, hover, preview, overlay)
             local hw = (C.TILE_W / 2) * BUILD_SCALE
             local hh = (C.TILE_H / 2) * BUILD_SCALE
             love.graphics.setColor(C.COLOR.BUILD_MED_CENTER)
+            love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
+        end
+        -- Water pump: filled diamond to distinguish it from plain pipe tiles.
+        if tile.pump then
+            local cx, cy = Iso.tile_to_screen(x, y)
+            local hw = (C.TILE_W / 2) * BUILD_SCALE
+            local hh = (C.TILE_H / 2) * BUILD_SCALE
+            love.graphics.setColor(C.COLOR.BUILD_PUMP)
             love.graphics.polygon("fill", cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy)
         end
         -- Station anchor: draw a diamond outline so the anchor tile is distinct
