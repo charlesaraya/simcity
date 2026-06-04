@@ -211,7 +211,7 @@ describe("Goods", function()
             assert.are.same({}, Goods.demand_rate(w))
         end)
 
-        it("residential buildings demand food; commercial buildings demand nothing", function()
+        it("residential demands food; commercial demands processed goods", function()
             local w = World.new(1)
             World.zone_tile(w, 20, 20, C.ZONE.RESIDENTIAL)
             World.start_building(w, 20, 20)
@@ -220,9 +220,22 @@ describe("Goods", function()
             World.start_building(w, 21, 20)
             World.complete_building(w, 21, 20)
             local d = Goods.demand_rate(w)
-            -- Residential consumes food; commercial contributes nothing.
             assert.are.equal(C.RES_DEMAND[C.GOODS.FOOD], d[C.GOODS.FOOD])
+            assert.are.equal(C.COM_DEMAND[C.GOODS.PROCESSED_GOODS], d[C.GOODS.PROCESSED_GOODS])
             assert.is_nil(d[C.GOODS.RAW_MATERIALS])
+        end)
+
+        it("sums PROCESSED_GOODS demand across completed COM buildings", function()
+            local w = World.new(1)
+            World.zone_tile(w, 20, 20, C.ZONE.COMMERCIAL)
+            World.start_building(w, 20, 20)
+            World.complete_building(w, 20, 20)
+            World.zone_tile(w, 21, 20, C.ZONE.COMMERCIAL)
+            World.start_building(w, 21, 20)
+            World.complete_building(w, 21, 20)
+            local d = Goods.demand_rate(w)
+            assert.are.equal(2 * C.COM_DEMAND[C.GOODS.PROCESSED_GOODS],
+                d[C.GOODS.PROCESSED_GOODS])
         end)
     end)
 
@@ -268,9 +281,11 @@ describe("Goods", function()
             local w = World.new(1)
             build_ind(w, 30, 30)
             Goods.system().tick(w)
-            assert.are.same({}, w.goods.supply)
+            -- First tick: raw_eff = 1 (no prior demand record) → full IND production.
             assert.are.equal(C.IND_DEMAND[C.GOODS.RAW_MATERIALS],
                 w.goods.demand[C.GOODS.RAW_MATERIALS])
+            assert.are.equal(C.IND_PRODUCTION,
+                w.goods.supply[C.GOODS.PROCESSED_GOODS])
         end)
 
         it("depletes inventory when demand exceeds supply", function()
@@ -316,6 +331,50 @@ describe("Goods", function()
             Goods.system().tick(w)
             assert.are.equal(C.IRON_MINE.PRODUCTION,
                 w.goods.inventory[C.GOODS.RAW_MATERIALS])
+        end)
+    end)
+
+    describe("supply_rate (processed goods)", function()
+        it("IND produces PROCESSED_GOODS at full rate when raw materials are available", function()
+            local w = World.new(1)
+            build_ind(w, 30, 30)
+            -- Pre-load raw materials so efficiency = 1.
+            w.goods.demand[C.GOODS.RAW_MATERIALS] = C.IND_DEMAND[C.GOODS.RAW_MATERIALS]
+            w.goods.inventory[C.GOODS.RAW_MATERIALS] =
+                C.IND_DEMAND[C.GOODS.RAW_MATERIALS] * C.GOODS_TUNE.BUFFER_MONTHS
+            local s = Goods.supply_rate(w)
+            assert.are.equal(C.IND_PRODUCTION, s[C.GOODS.PROCESSED_GOODS])
+        end)
+
+        it("IND produces zero PROCESSED_GOODS when raw materials efficiency is zero", function()
+            local w = World.new(1)
+            build_ind(w, 30, 30)
+            -- Force raw_eff = 0: demand > 0, inventory = 0.
+            w.goods.demand[C.GOODS.RAW_MATERIALS] = 10
+            w.goods.inventory[C.GOODS.RAW_MATERIALS] = 0
+            local s = Goods.supply_rate(w)
+            local produced = s[C.GOODS.PROCESSED_GOODS] or 0
+            assert.are.equal(0, produced)
+        end)
+
+        it("scales proportionally with raw materials efficiency", function()
+            local w = World.new(1)
+            build_ind(w, 30, 30)
+            -- Set raw_eff = 0.5: half buffer stocked.
+            local dem = C.IND_DEMAND[C.GOODS.RAW_MATERIALS]
+            w.goods.demand[C.GOODS.RAW_MATERIALS] = dem
+            w.goods.inventory[C.GOODS.RAW_MATERIALS] = dem * C.GOODS_TUNE.BUFFER_MONTHS * 0.5
+            local s = Goods.supply_rate(w)
+            local expected = C.IND_PRODUCTION * 0.5
+            assert.is_true(math.abs((s[C.GOODS.PROCESSED_GOODS] or 0) - expected) < 0.001)
+        end)
+
+        it("under-construction IND buildings contribute nothing", function()
+            local w = World.new(1)
+            World.zone_tile(w, 30, 30, C.ZONE.INDUSTRIAL)
+            World.start_building(w, 30, 30)
+            local s = Goods.supply_rate(w)
+            assert.is_nil(s[C.GOODS.PROCESSED_GOODS])
         end)
     end)
 end)

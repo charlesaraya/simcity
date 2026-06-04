@@ -488,11 +488,12 @@ describe("World", function()
 
     -- Phase 5 step 1: typed goods data layer + iron deposit seeding
     describe("goods", function()
-        it("new() initializes world.goods with empty supply/demand and seeded food inventory", function()
+        it("new() initializes world.goods with empty supply/demand and seeded starting inventories", function()
             local w = World.new(1)
             assert.are.same({}, w.goods.supply)
             assert.are.same({}, w.goods.demand)
             assert.are.equal(10, w.goods.inventory[C.GOODS.FOOD])
+            assert.are.equal(10, w.goods.inventory[C.GOODS.PROCESSED_GOODS])
         end)
     end)
 

@@ -97,11 +97,14 @@ function Growth.system()
                     local has_power = cid ~= nil and (headroom[cid] or 0) >= draw
                     -- Res/com skip tiles below the land-value floor (too polluted).
                     local lv = land_value_factor(world, x, y, tile.zone)
-                    -- Supply chain gates: IND needs raw materials, RES needs food.
+                    -- Supply chain gates: IND needs raw materials, RES needs food,
+                    -- COM needs processed goods (IND output).
                     local supply_eff = (tile.zone == C.ZONE.INDUSTRIAL)
                         and Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
                         or (tile.zone == C.ZONE.RESIDENTIAL)
                         and Goods.efficiency(world, C.GOODS.FOOD)
+                        or (tile.zone == C.ZONE.COMMERCIAL)
+                        and Goods.efficiency(world, C.GOODS.PROCESSED_GOODS)
                         or 1
                     -- Build cost debited on start; treasury acts as the throttle.
                     local cost = C.BUILD_COST[tile.zone] or 0

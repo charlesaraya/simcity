@@ -259,13 +259,29 @@ function Hud.draw(world, opts)
     logi_row("RAW STOCK",  tostring(raw_inv),   logi_top + 32 + 2 * ROW_H)
     logi_eff("RAW EFF",    raw_eff,             logi_top + 32 + 3 * ROW_H)
 
-    -- Divider between sections.
+    -- Divider.
     love.graphics.setColor(Theme.color("dim_fg"))
     love.graphics.line(LOGI_X + 12, logi_top + 32 + 4 * ROW_H + 4,
                        LOGI_X + LOGI_W - 12, logi_top + 32 + 4 * ROW_H + 4)
 
+    -- Processed-goods rows (IND output, raw-eff scaled → COM input).
+    local proc_base = logi_top + 32 + 5 * ROW_H
+    local proc_s   = world.goods.supply[C.GOODS.PROCESSED_GOODS]    or 0
+    local proc_d   = world.goods.demand[C.GOODS.PROCESSED_GOODS]    or 0
+    local proc_inv = world.goods.inventory[C.GOODS.PROCESSED_GOODS] or 0
+    local proc_eff = math.floor(Goods.efficiency(world, C.GOODS.PROCESSED_GOODS) * 100)
+    logi_row("PROC SUPPLY", string.format("%.1f/mo", proc_s), proc_base)
+    logi_row("PROC DEMAND", proc_d .. "/mo",                  proc_base + ROW_H)
+    logi_row("PROC STOCK",  string.format("%.1f", proc_inv),  proc_base + 2 * ROW_H)
+    logi_eff("PROC EFF",    proc_eff,                         proc_base + 3 * ROW_H)
+
+    -- Divider.
+    love.graphics.setColor(Theme.color("dim_fg"))
+    love.graphics.line(LOGI_X + 12, proc_base + 4 * ROW_H + 4,
+                       LOGI_X + LOGI_W - 12, proc_base + 4 * ROW_H + 4)
+
     -- Food rows (farm-zone output, fertility-scaled).
-    local food_base = logi_top + 32 + 5 * ROW_H
+    local food_base = proc_base + 5 * ROW_H
     local food_s   = world.goods.supply[C.GOODS.FOOD]    or 0
     local food_d   = world.goods.demand[C.GOODS.FOOD]    or 0
     local food_inv = world.goods.inventory[C.GOODS.FOOD] or 0

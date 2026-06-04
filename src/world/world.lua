@@ -107,11 +107,12 @@ function World.new(seed, opts)
         freight   = { bridged = {} },
         power     = { topology = {}, powered = {} },
         pollution = { field = {}, dirty = false },
-        -- Phase 5: typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
-        -- Seed a small food reserve so the first few residents can grow before
-        -- farms are established; raw materials start empty (mine chain required).
+        -- Typed-goods stockpiles (supply/demand/inventory keyed by C.GOODS.*).
+        -- Seed food + processed goods so RES/COM can start before full supply chains
+        -- are established. Raw materials start empty (mine → rail → station chain required).
         goods     = { supply = {}, demand = {},
-                      inventory = { [C.GOODS.FOOD] = 10 } },
+                      inventory = { [C.GOODS.FOOD] = 10,
+                                    [C.GOODS.PROCESSED_GOODS] = 10 } },
         crew      = {},
         mission   = {},
     }

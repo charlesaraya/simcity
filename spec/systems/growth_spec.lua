@@ -494,4 +494,49 @@ describe("Growth supply-chain efficiency", function()
         for _ = 1, 40 do g.tick(w) end
         assert.are.equal(0, abandons)
     end)
+
+    it("COM stalls when processed goods inventory is empty", function()
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.COMMERCIAL)
+        w.demand.commercial = 0.8
+        -- Drain the starting processed goods buffer: force efficiency = 0.
+        w.goods.demand[C.GOODS.PROCESSED_GOODS] = 100
+        w.goods.inventory[C.GOODS.PROCESSED_GOODS] = 0
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        assert.are.equal(0, World.count_buildings(w, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE))
+    end)
+
+    it("COM grows when processed goods are available", function()
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.COMMERCIAL)
+        w.demand.commercial = 0.8
+        -- Ensure processed goods buffer is full.
+        w.goods.demand[C.GOODS.PROCESSED_GOODS] = 1
+        w.goods.inventory[C.GOODS.PROCESSED_GOODS] = C.GOODS_TUNE.BUFFER_MONTHS
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        assert.is_true(World.count_buildings(w, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE) > 0)
+    end)
+
+    it("COM buildings do not abandon when processed goods starved (growth stalls, no eviction)", function()
+        local w = World.new(1)
+        connect_left_edge(w, 8)
+        zone_patch(w, 8, C.ZONE.COMMERCIAL)
+        w.demand.commercial = 0.8
+        local g = Growth.system()
+        for _ = 1, 30 do g.tick(w) end
+        local built = World.count_buildings(w, C.ZONE.COMMERCIAL, C.BUILD.COMPLETE)
+        if built == 0 then return end
+
+        -- Drain processed goods: efficiency = 0.
+        w.goods.demand[C.GOODS.PROCESSED_GOODS] = 100
+        w.goods.inventory[C.GOODS.PROCESSED_GOODS] = 0
+        local abandons = 0
+        Bus.subscribe(C.EVENTS.BUILDING_ABANDONED, function() abandons = abandons + 1 end)
+        for _ = 1, 40 do g.tick(w) end
+        assert.are.equal(0, abandons)
+    end)
 end)

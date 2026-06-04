@@ -9,6 +9,7 @@
 -- population: farms are needed wherever people live.
 
 local World = require("src.world.world")
+local Goods = require("src.systems.goods")
 local C = require("src.world.constants")
 
 local Demand = {}
@@ -24,13 +25,18 @@ end
 --   industry supplies shops      -> id rises while ind < com * IND_PER_COM
 --   farms feed residents         -> ad rises while agri < res * FARM_PER_RES
 -- JOB_PULL > 1 is self-amplifying. BASE_RES seeds the empty city.
-function Demand.compute(res, com, ind, agri)
-    agri = agri or 0
-    local jobs = com + ind
-    local rd = clamp(C.DEMAND.BASE_RES + (jobs * C.DEMAND.JOB_PULL - res) * C.DEMAND.SENS, -1, 1)
-    local cd = clamp((res * C.DEMAND.COM_PER_RES  - com)  * C.DEMAND.SENS, -1, 1)
-    local id = clamp((com * C.DEMAND.IND_PER_COM  - ind)  * C.DEMAND.SENS, -1, 1)
-    local ad = clamp((res * C.DEMAND.FARM_PER_RES - agri) * C.DEMAND.SENS, -1, 1)
+-- raw_eff [0..1]: raw-material supply efficiency. Scales positive IND demand —
+--   no raw materials = no point building more industry. Negative demand (oversupply)
+--   is unaffected so abandon signals still fire.
+function Demand.compute(res, com, ind, agri, raw_eff)
+    agri    = agri    or 0
+    raw_eff = raw_eff or 1
+    local jobs   = com + ind
+    local rd     = clamp(C.DEMAND.BASE_RES + (jobs * C.DEMAND.JOB_PULL - res) * C.DEMAND.SENS, -1, 1)
+    local cd     = clamp((res * C.DEMAND.COM_PER_RES  - com)  * C.DEMAND.SENS, -1, 1)
+    local id_raw = (com * C.DEMAND.IND_PER_COM - ind) * C.DEMAND.SENS
+    local id     = id_raw > 0 and clamp(id_raw * raw_eff, -1, 1) or clamp(id_raw, -1, 1)
+    local ad     = clamp((res * C.DEMAND.FARM_PER_RES - agri) * C.DEMAND.SENS, -1, 1)
     return rd, cd, id, ad
 end
 
@@ -43,7 +49,8 @@ function Demand.system()
             local com   = World.count_buildings(world, C.ZONE.COMMERCIAL,   C.BUILD.COMPLETE)
             local ind   = World.count_buildings(world, C.ZONE.INDUSTRIAL,   C.BUILD.COMPLETE)
             local agri  = World.count_buildings(world, C.ZONE.AGRICULTURAL, C.BUILD.COMPLETE)
-            local rd, cd, id, ad = Demand.compute(res, com, ind, agri)
+            local raw_eff = Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
+            local rd, cd, id, ad = Demand.compute(res, com, ind, agri, raw_eff)
             world.demand.residential  = rd
             world.demand.commercial   = cd
             world.demand.industrial   = id

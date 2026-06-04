@@ -111,6 +111,33 @@ describe("Demand", function()
             local _, _, _, ad2 = Demand.compute(10, 0, 0, 0)
             assert.are.equal(ad, ad2)
         end)
+
+        it("defaults raw_eff to 1 (back-compat)", function()
+            local _, _, id1 = Demand.compute(0, 5, 0, 0)
+            local _, _, id2 = Demand.compute(0, 5, 0, 0, 1)
+            assert.are.equal(id1, id2)
+        end)
+
+        it("IND demand is zero when raw_eff is zero (no raw materials)", function()
+            -- Commerce present but no raw materials → no point building industry.
+            local _, _, id = Demand.compute(0, 5, 0, 0, 0)
+            assert.are.equal(0, id)
+        end)
+
+        it("IND demand scales proportionally with raw_eff", function()
+            local _, _, id_full = Demand.compute(0, 5, 0, 0, 1)
+            local _, _, id_half = Demand.compute(0, 5, 0, 0, 0.5)
+            assert.is_true(id_full > 0)
+            assert.is_true(math.abs(id_half - id_full * 0.5) < 0.001)
+        end)
+
+        it("IND oversupply abandon signal unaffected by raw_eff (negative demand stays negative)", function()
+            -- More IND than COM needs → negative demand regardless of raw_eff.
+            local _, _, id_raw0 = Demand.compute(0, 1, 10, 0, 0)
+            local _, _, id_raw1 = Demand.compute(0, 1, 10, 0, 1)
+            assert.is_true(id_raw0 < 0)
+            assert.is_true(id_raw1 < 0)
+        end)
     end)
 
     describe("system", function()

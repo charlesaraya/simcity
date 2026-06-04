@@ -209,9 +209,7 @@ C.ROAD         = {
     COST = 10,
 }
 
--- One-time cost to zone a tile, charged at zoning.
--- Housing is cheap to encourage settlement; industry is priciest.
--- One-time cost charged when a building actually starts construction (not on zone).
+-- One-time cost charged when a building starts construction (not on zone).
 -- Zoning itself is free; treasury is debited by the growth system on build start.
 C.BUILD_COST   = {
     [C.ZONE.RESIDENTIAL]  = 30,
@@ -302,6 +300,16 @@ C.GOODS_TUNE   = {
 -- Keyed by C.GOODS.* integer so Goods.demand_rate() can iterate directly.
 C.IND_DEMAND   = {
     [C.GOODS.RAW_MATERIALS] = 2,
+}
+
+-- Processed-goods output per completed industrial building per month.
+-- Scaled by raw-materials efficiency; starved IND produces proportionally less.
+-- At 4:2:1 ratio: 1 IND × 4 = 4/mo exactly covers 2 COM × 2 = 4/mo.
+C.IND_PRODUCTION = 4
+
+-- Processed-goods demand per completed commercial building per month.
+C.COM_DEMAND   = {
+    [C.GOODS.PROCESSED_GOODS] = 2,
 }
 
 -- Food demand per completed residential building per month.

@@ -64,6 +64,18 @@ function Goods.supply_rate(world)
             (rates[C.GOODS.RAW_MATERIALS] or 0) + C.IRON_MINE.PRODUCTION
     end
 
+    -- Processed goods: each completed IND building outputs IND_PRODUCTION per month,
+    -- scaled by raw-materials efficiency (starved IND processes proportionally less).
+    local raw_eff = Goods.efficiency(world, C.GOODS.RAW_MATERIALS)
+    Grid.each(world.grid, function(_, _, tile)
+        if tile.zone == C.ZONE.INDUSTRIAL
+        and tile.building and tile.building.state == C.BUILD.COMPLETE then
+            local output = C.IND_PRODUCTION * raw_eff
+            rates[C.GOODS.PROCESSED_GOODS] =
+                (rates[C.GOODS.PROCESSED_GOODS] or 0) + output
+        end
+    end)
+
     -- Food: completed agricultural buildings produce at a rate scaled by tile fertility.
     Grid.each(world.grid, function(x, y, tile)
         if tile.zone == C.ZONE.AGRICULTURAL
@@ -84,6 +96,10 @@ function Goods.demand_rate(world)
         if not (tile.building and tile.building.state == C.BUILD.COMPLETE) then return end
         if tile.zone == C.ZONE.INDUSTRIAL then
             for good, amount in pairs(C.IND_DEMAND) do
+                rates[good] = (rates[good] or 0) + amount
+            end
+        elseif tile.zone == C.ZONE.COMMERCIAL then
+            for good, amount in pairs(C.COM_DEMAND) do
                 rates[good] = (rates[good] or 0) + amount
             end
         elseif tile.zone == C.ZONE.RESIDENTIAL then
